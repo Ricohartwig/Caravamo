@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+  <body style="margin:0;padding:0;background:#f3eee4;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      Hier setzt du ein neues Passwort für dein Caravamo-Konto. Der Link gilt nur kurze Zeit.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3eee4;margin:0;padding:0;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+            <tr>
+              <td style="padding:0 8px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td width="36" height="36" align="center" valign="middle" style="width:36px;height:36px;background:#1e3f36;border-radius:8px;color:#fbf7ef;font-family:Georgia, 'Times New Roman', serif;font-size:18px;font-weight:700;">
+                      C
+                    </td>
+                    <td style="padding-left:10px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;line-height:24px;color:#14211c;font-weight:700;">
+                      Caravamo
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#fffdf8;border:1px solid #e4d8c4;border-radius:20px;padding:36px 32px;">
+                <p style="margin:0;font-family:Georgia, 'Times New Roman', serif;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:#9a431c;">
+                  Passwort zurücksetzen
+                </p>
+                <h1 style="margin:12px 0 0;font-family:Georgia, 'Times New Roman', serif;font-size:32px;line-height:38px;font-weight:700;color:#14211c;">
+                  Wähle ein neues Passwort.
+                </h1>
+                <p style="margin:18px 0 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:26px;color:#1c1915;">
+                  Für <strong>{{ .Email }}</strong> wurde ein neues Passwort angefordert. Über den Knopf gelangst du auf eine Seite, auf der du es festlegen kannst.
+                </p>
+                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 0;">
+                  <tr>
+                    <td align="center" bgcolor="#9a431c" style="background:#9a431c;border-radius:12px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 22px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#fbf7ef;text-decoration:none;">
+                        Neues Passwort setzen
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:28px 0 0;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:22px;color:#5c564c;">
+                  Der Link gilt nur kurze Zeit und nur einmal. Wenn der Knopf nicht funktioniert, kopiere diese Adresse in den Browser:
+                </p>
+                <p style="margin:8px 0 0;font-family:Arial, Helvetica, sans-serif;font-size:13px;line-height:20px;word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#1e3f36;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 8px 0;font-family:Arial, Helvetica, sans-serif;font-size:13px;line-height:20px;color:#5c564c;">
+                Du hast das nicht angefordert? Dann ignoriere diese E-Mail. Dein Passwort bleibt unverändert.
+                <br /><br />
+                Caravamo · Marktplatz für Wohnmobile, Wohnwagen und Kabinen
+                <br />
+                <a href="https://caravamo.vercel.app" style="color:#1e3f36;text-decoration:none;">caravamo.vercel.app</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

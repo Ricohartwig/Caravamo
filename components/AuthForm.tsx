@@ -78,6 +78,13 @@ export function AuthForm({ mode, nextPath, notice }: AuthFormProps) {
             className={fieldClassName}
           />
         </label>
+        {isLogin ? (
+          <p className="text-right text-sm">
+            <Link href="/passwort-vergessen" className="font-semibold text-pine">
+              Passwort vergessen?
+            </Link>
+          </p>
+        ) : null}
         {state.error ? (
           <p role="alert" className="text-sm text-copper-dark">
             {state.error}

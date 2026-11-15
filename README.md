@@ -18,4 +18,6 @@ npm run dev
 
 Das Tabellenschema liegt in `supabase-schema.sql`. Fahrzeuge hängen an `auth.users`. Wohnmobile sind Zeilen in `vehicles` mit `type = 'Wohnmobil'`. Der öffentliche Storage-Bucket heißt `vehicle-images`. `/inserieren` ist nur angemeldet erreichbar. Die Google-Anmeldung braucht den Google-Provider im Supabase-Dashboard.
 
-Die Bestätigungsmail liegt in `supabase/templates/confirmation.html`. Betreff: „Caravamo: Bitte bestätige deine E-Mail“. Sie wird im Supabase-Dashboard unter Authentication → Email Templates → Confirm signup hinterlegt.
+Die Bestätigungsmail liegt in `supabase/templates/confirmation.html`. Betreff: „Caravamo: Bitte bestätige deine E-Mail“. Sie wird im Supabase-Dashboard unter Authentication → Email Templates → Confirm signup hinterlegt. Die Mail zum neuen Passwort liegt in `supabase/templates/recovery.html`. Betreff: „Caravamo: Setze dein Passwort neu“, Vorlage Reset password.
+
+Eine neue Anfrage und jede Antwort schicken eine E-Mail an die andere Seite. Dafür stehen `RESEND_API_KEY` und `MAIL_FROM` in der Umgebung, zum Beispiel `Caravamo <anfragen@deine-domain.de>`. Die Absenderadresse muss bei Resend bestätigt sein. Fehlen die Werte, bleibt die Nachricht im Konto und es geht keine Mail hinaus.

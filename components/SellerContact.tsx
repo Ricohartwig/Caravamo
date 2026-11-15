@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { InquiryForm } from "@/components/account/InquiryForm";
+import { isMailConfigured } from "@/lib/mail";
 import { VehicleActions } from "@/components/account/VehicleActions";
 import type { CardMarks } from "@/lib/account";
 
@@ -48,7 +49,7 @@ export function SellerContact({
           .
         </p>
       ) : viewerId ? (
-        <InquiryForm vehicleId={vehicleId} />
+        <InquiryForm vehicleId={vehicleId} mailReady={isMailConfigured()} />
       ) : (
         <Link
           href={`/login?next=${encodeURIComponent(`/fahrzeug/${vehicleId}`)}`}

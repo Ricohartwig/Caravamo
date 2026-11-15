@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { markInquiryRead, replyToInquiry } from "@/actions/account";
 import { currentUser, getInquiryThread } from "@/lib/account";
 import { formatDateTime } from "@/lib/format";
+import { isMailConfigured } from "@/lib/mail";
 
 export const metadata: Metadata = {
   title: "Anfrage",
@@ -103,6 +104,11 @@ async function Thread({
         <button type="submit" className="mt-3 inline-flex h-11 items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam">
           Antwort senden
         </button>
+        <p className="mt-3 text-sm text-muted">
+          {isMailConfigured()
+            ? "Die Gegenseite sieht die Antwort im Konto und bekommt eine E-Mail."
+            : "Die Gegenseite sieht die Antwort im Konto."}
+        </p>
       </form>
     </div>
   );
