@@ -4,6 +4,7 @@ import { getSupabaseEnv, isSupabaseConfigured } from "@/utils/supabase/env";
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  request.headers.set("x-caravamo-path", pathname);
   const needsAccount =
     pathname === "/inserieren" ||
     pathname.startsWith("/inserieren/") ||
@@ -12,7 +13,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!isSupabaseConfigured()) {
     if (!needsAccount) {
-      return NextResponse.next();
+      return NextResponse.next({ request });
     }
 
     const loginUrl = request.nextUrl.clone();
