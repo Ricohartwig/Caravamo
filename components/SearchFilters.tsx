@@ -1,4 +1,5 @@
-import { brands, modelsByBrand, vehicleTypes } from "@/lib/vehicles";
+import Link from "next/link";
+import { allBodyTypes, listingCategories } from "@/lib/listing-options";
 import type { VehicleFilters } from "@/lib/filters";
 
 const fieldClassName =
@@ -9,10 +10,12 @@ type SearchFiltersProps = {
 };
 
 export function SearchFilters({ filters }: SearchFiltersProps) {
+  const selectedKind = filters.body || filters.type;
+
   return (
     <aside className="w-full shrink-0 lg:w-72">
       <form
-        key={`${filters.brand}-${filters.model}-${filters.type}`}
+        key={`${filters.brand}-${filters.model}-${selectedKind}-${filters.priceMin}-${filters.priceMax}`}
         action="/suche"
         method="get"
         aria-label="Filter"
@@ -20,59 +23,72 @@ export function SearchFilters({ filters }: SearchFiltersProps) {
       >
         <h2 className="text-base font-semibold">Filter</h2>
 
-        <label htmlFor="filter-marke" className="mt-4 block text-sm font-medium">
+        <label htmlFor="filter-brand" className="mt-4 block text-sm font-medium">
           Marke
-          <select
-            id="filter-marke"
-            name="marke"
+          <input
+            id="filter-brand"
+            name="brand"
             defaultValue={filters.brand}
             className={fieldClassName}
-          >
-            <option value="">Alle Marken</option>
-            {brands.map((brand) => (
-              <option key={brand} value={brand}>
-                {brand}
-              </option>
-            ))}
-          </select>
+          />
         </label>
 
-        <label htmlFor="filter-modell" className="mt-4 block text-sm font-medium">
+        <label htmlFor="filter-model" className="mt-4 block text-sm font-medium">
           Modell
-          <select
-            id="filter-modell"
-            name="modell"
+          <input
+            id="filter-model"
+            name="model"
             defaultValue={filters.model}
             className={fieldClassName}
-          >
-            <option value="">Alle Modelle</option>
-            {brands.map((brand) => (
-              <optgroup key={brand} label={brand}>
-                {modelsByBrand[brand].map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          />
         </label>
 
-        <label htmlFor="filter-typ" className="mt-4 block text-sm font-medium">
+        <label htmlFor="filter-type" className="mt-4 block text-sm font-medium">
           Fahrzeugtyp
           <select
-            id="filter-typ"
-            name="typ"
-            defaultValue={filters.type}
+            id="filter-type"
+            name="type"
+            defaultValue={selectedKind}
             className={fieldClassName}
           >
             <option value="">Alle Fahrzeugtypen</option>
-            {vehicleTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
+            <optgroup label="Fahrzeugart">
+              {listingCategories.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Aufbau">
+              {allBodyTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </optgroup>
           </select>
+        </label>
+
+        <label htmlFor="filter-price-min" className="mt-4 block text-sm font-medium">
+          Preis von
+          <input
+            id="filter-price-min"
+            name="price_min"
+            inputMode="numeric"
+            defaultValue={filters.priceMin ?? ""}
+            className={fieldClassName}
+          />
+        </label>
+
+        <label htmlFor="filter-price-max" className="mt-4 block text-sm font-medium">
+          Preis bis
+          <input
+            id="filter-price-max"
+            name="price_max"
+            inputMode="numeric"
+            defaultValue={filters.priceMax ?? ""}
+            className={fieldClassName}
+          />
         </label>
 
         <button
@@ -81,12 +97,12 @@ export function SearchFilters({ filters }: SearchFiltersProps) {
         >
           Filter anwenden
         </button>
-        <a
+        <Link
           href="/suche"
           className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-muted hover:text-foreground"
         >
           Zurücksetzen
-        </a>
+        </Link>
       </form>
     </aside>
   );

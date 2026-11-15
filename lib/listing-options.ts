@@ -40,6 +40,24 @@ export const bodyTypes: Record<ListingCategory, readonly string[]> = {
   Kabine: ["Absetzkabine", "Wohnkabine"],
 };
 
+export const allBodyTypes = Object.values(bodyTypes).flat();
+
+export function canonicalBodyType(value: string): string | null {
+  const needle = value.trim().toLocaleLowerCase("de-DE");
+  if (!needle) {
+    return null;
+  }
+
+  for (const option of allBodyTypes) {
+    const label = option.toLocaleLowerCase("de-DE");
+    if (label === needle || label.startsWith(`${needle} `) || label.startsWith(`${needle}(`)) {
+      return option;
+    }
+  }
+
+  return null;
+}
+
 export const fuels = ["Diesel", "Elektro", "Benzin"] as const;
 export const transmissions = ["Schaltgetriebe", "Automatik"] as const;
 export const emissionStandards = ["Euro 6d", "Euro 6d-TEMP", "Euro 6", "Euro 5", "Euro 4"] as const;
