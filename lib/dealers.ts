@@ -21,6 +21,12 @@ export type PublicDealer = {
   openingHours: string | null;
   vatId: string | null;
   services: { id: DealerService; label: string }[];
+  logoUrl: string | null;
+  legalForm: string | null;
+  registerCourt: string | null;
+  registerNumber: string | null;
+  publicEmail: string | null;
+  representedBy: string | null;
   memberSince: string | null;
   offerCount: number;
 };
@@ -85,6 +91,8 @@ export function dealerJsonLd(dealer: PublicDealer): Record<string, unknown> {
     url: absoluteUrl(`/haendler/${dealer.id}`),
     description: dealer.about ?? undefined,
     telephone: dealer.phone ?? undefined,
+    email: dealer.publicEmail ?? undefined,
+    logo: dealer.logoUrl ?? undefined,
     vatID: dealer.vatId ?? undefined,
     address: {
       "@type": "PostalAddress",
@@ -104,7 +112,9 @@ const loadDealers = cache(async (): Promise<PublicDealer[]> => {
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("dealer_profiles")
-    .select("id, company_name, contact_name, phone, street, postal_code, city, website, about, opening_hours, vat_id, services, created_at");
+    .select(
+      "id, company_name, contact_name, phone, street, postal_code, city, website, about, opening_hours, vat_id, services, logo_url, legal_form, register_court, register_number, public_email, represented_by, created_at",
+    );
 
   if (error || !Array.isArray(data)) {
     return [];
@@ -134,6 +144,12 @@ const loadDealers = cache(async (): Promise<PublicDealer[]> => {
         openingHours: readString(row.opening_hours),
         vatId: readString(row.vat_id),
         services: readServices(row.services),
+        logoUrl: readString(row.logo_url),
+        legalForm: readString(row.legal_form),
+        registerCourt: readString(row.register_court),
+        registerNumber: readString(row.register_number),
+        publicEmail: readString(row.public_email),
+        representedBy: readString(row.represented_by),
         memberSince: readString(row.created_at),
         offerCount: 0,
       },

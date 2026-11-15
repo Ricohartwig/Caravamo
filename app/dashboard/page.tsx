@@ -10,6 +10,7 @@ import {
   listRecentViews,
 } from "@/lib/account";
 import { formatDateTime, formatPrice } from "@/lib/format";
+import { profileSlotCount } from "@/lib/profile";
 import { listingsExpiringWithin, listOwnedVehicles } from "@/lib/owned-listings";
 
 export const metadata: Metadata = {
@@ -84,7 +85,7 @@ async function Overview({
       ) : null}
       <Link href="/dashboard/profil" className="mt-4 block rounded-2xl border border-line bg-card px-4 py-3 hover:bg-sand">
         <p className="text-sm font-semibold">
-          {profile.gaps.length === 0 ? "Profil vollständig" : `Profil ${profile.business ? 10 - profile.gaps.length : 5 - profile.gaps.length} von ${profile.business ? 10 : 5}`}
+          {profile.gaps.length === 0 ? "Profil vollständig" : `Profil ${profileSlotCount(profile.business) - profile.gaps.length} von ${profileSlotCount(profile.business)}`}
         </p>
         <p className="mt-1 text-sm text-muted">
           {profile.gaps.length === 0

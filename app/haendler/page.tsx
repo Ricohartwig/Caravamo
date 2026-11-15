@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { listDealers } from "@/lib/dealers";
@@ -26,7 +27,7 @@ async function DealerDirectory() {
       <p className="text-sm font-medium text-copper-dark">Gewerbe</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Händler auf Caravamo</h1>
       <p className="mt-4 max-w-2xl text-lg leading-8 text-muted">
-        Jeder Händler mit Firmenname und Ort hat eine eigene Seite: Betrieb, Ansprechpartner, Adresse, Telefon, Leistungen und die aktuellen Inserate.
+        Jeder Händler mit Firmenname und Ort hat eine eigene Seite: Logo, Öffnungszeiten, Impressum und die aktuell aktiven Inserate.
       </p>
       <Link
         href="/registrieren"
@@ -41,7 +42,18 @@ async function DealerDirectory() {
           {dealers.map((dealer) => (
             <li key={dealer.id}>
               <Link href={`/haendler/${dealer.id}`} className="block h-full rounded-2xl border border-line bg-card p-5 hover:bg-sand">
-                <h2 className="text-lg font-semibold">{dealer.companyName}</h2>
+                <div className="flex items-center gap-3">
+                  {dealer.logoUrl ? (
+                    <Image
+                      src={dealer.logoUrl}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="size-12 shrink-0 rounded-xl border border-line bg-foam object-contain p-1"
+                    />
+                  ) : null}
+                  <h2 className="text-lg font-semibold">{dealer.companyName}</h2>
+                </div>
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <MapPin aria-hidden="true" className="size-4 text-pine" />
                   {[dealer.postalCode, dealer.city].filter(Boolean).join(" ")}
