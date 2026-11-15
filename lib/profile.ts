@@ -1,3 +1,21 @@
+import { acceptOwnLogo } from "@/lib/vehicle-images";
+
+export const legalForms = [
+  "Einzelunternehmen",
+  "e.K.",
+  "GbR",
+  "UG (haftungsbeschränkt)",
+  "GmbH",
+  "GmbH & Co. KG",
+  "AG",
+  "OHG",
+  "KG",
+] as const;
+
+export type LegalForm = (typeof legalForms)[number];
+
+const legalFormIds = new Set<string>(legalForms);
+
 export const dealerServiceOptions = [
   { id: "finanzierung", label: "Finanzierung" },
   { id: "inzahlungnahme", label: "Inzahlungnahme" },
@@ -21,6 +39,12 @@ export type ProfileFields = {
   openingHours: string;
   vatId: string;
   services: DealerService[];
+  logoUrl: string;
+  legalForm: string;
+  registerCourt: string;
+  registerNumber: string;
+  publicEmail: string;
+  representedBy: string;
 };
 
 export type ProfileGap = {
@@ -41,7 +65,17 @@ export function emptyProfile(): ProfileFields {
     openingHours: "",
     vatId: "",
     services: [],
+    logoUrl: "",
+    legalForm: "",
+    registerCourt: "",
+    registerNumber: "",
+    publicEmail: "",
+    representedBy: "",
   };
+}
+
+export function profileSlotCount(business: boolean): number {
+  return profileGaps(emptyProfile(), business).length;
 }
 
 export function profileGaps(fields: ProfileFields, business: boolean): ProfileGap[] {
@@ -76,6 +110,21 @@ export function profileGaps(fields: ProfileFields, business: boolean): ProfileGa
   if (business && !fields.vatId) {
     gaps.push({ id: "vat", label: "USt-IdNr." });
   }
+  if (business && !fields.logoUrl) {
+    gaps.push({ id: "logo", label: "Logo" });
+  }
+  if (business && !fields.publicEmail) {
+    gaps.push({ id: "public-email", label: "E-Mail im Impressum" });
+  }
+  if (business && fields.representedBy.length < 2) {
+    gaps.push({ id: "represented", label: "Vertreten durch" });
+  }
+  if (business && !fields.legalForm) {
+    gaps.push({ id: "legal", label: "Rechtsform" });
+  }
+  if (business && (!fields.registerCourt || !fields.registerNumber)) {
+    gaps.push({ id: "register", label: "Handelsregister" });
+  }
   return gaps;
 }
 
@@ -89,7 +138,7 @@ export function serviceLabel(id: string): string {
 
 export type ProfileParse = { ok: true; fields: ProfileFields } | { ok: false; code: string };
 
-export function parseProfile(formData: FormData, business: boolean): ProfileParse {
+export function parseProfile(formData: FormData, business: boolean, userId: string): ProfileParse {
   const name = singleLine(formData.get("name"));
   const phone = singleLine(formData.get("phone"));
   const postalCode = singleLine(formData.get("postal_code"));
@@ -101,6 +150,12 @@ export function parseProfile(formData: FormData, business: boolean): ProfilePars
   const openingHours = business ? textBlock(formData.get("opening_hours")) : "";
   const vatId = business ? normalizeVat(singleLine(formData.get("vat_id"))) : "";
   const services = business ? readServices(formData.getAll("services")) : [];
+  const logoUrl = business ? acceptOwnLogo(singleLine(formData.get("logo_url")), userId) : "";
+  const legalForm = business ? singleLine(formData.get("legal_form")) : "";
+  const registerCourt = business ? singleLine(formData.get("register_court")) : "";
+  const registerNumber = business ? singleLine(formData.get("register_number")) : "";
+  const publicEmail = business ? singleLine(formData.get("public_email")) : "";
+  const representedBy = business ? singleLine(formData.get("represented_by")) : "";
 
   if (name.length < 2 || name.length > 80) {
     return { ok: false, code: "name" };
@@ -135,6 +190,24 @@ export function parseProfile(formData: FormData, business: boolean): ProfilePars
   if (services === null) {
     return { ok: false, code: "services" };
   }
+  if (logoUrl === null) {
+    return { ok: false, code: "logo" };
+  }
+  if (legalForm && !legalFormIds.has(legalForm)) {
+    return { ok: false, code: "legal" };
+  }
+  if (registerCourt && (registerCourt.length < 2 || registerCourt.length > 80)) {
+    return { ok: false, code: "register" };
+  }
+  if (registerNumber && (registerNumber.length < 2 || registerNumber.length > 40 || !/^[A-Za-z0-9 ./-]+$/.test(registerNumber))) {
+    return { ok: false, code: "register" };
+  }
+  if (publicEmail && !isEmail(publicEmail)) {
+    return { ok: false, code: "public-email" };
+  }
+  if (representedBy && (representedBy.length < 2 || representedBy.length > 80)) {
+    return { ok: false, code: "represented" };
+  }
 
   return {
     ok: true,
@@ -150,8 +223,18 @@ export function parseProfile(formData: FormData, business: boolean): ProfilePars
       openingHours,
       vatId,
       services,
+      logoUrl: logoUrl ?? "",
+      legalForm,
+      registerCourt,
+      registerNumber,
+      publicEmail,
+      representedBy,
     },
   };
+}
+
+function isEmail(value: string): boolean {
+  return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 export function profileRow(fields: ProfileFields, business: boolean) {
@@ -167,6 +250,12 @@ export function profileRow(fields: ProfileFields, business: boolean) {
     opening_hours: business ? fields.openingHours || null : null,
     vat_id: business ? fields.vatId || null : null,
     services: business ? fields.services : [],
+    logo_url: business ? fields.logoUrl || null : null,
+    legal_form: business ? fields.legalForm || null : null,
+    register_court: business ? fields.registerCourt || null : null,
+    register_number: business ? fields.registerNumber || null : null,
+    public_email: business ? fields.publicEmail || null : null,
+    represented_by: business ? fields.representedBy || null : null,
   };
 }
 

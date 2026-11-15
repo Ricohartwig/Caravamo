@@ -187,7 +187,9 @@ export async function accountProfile(userId: string): Promise<AccountProfile> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("users")
-    .select("name, phone, city, postal_code, street, company_name, website, about, opening_hours, vat_id, services, role, created_at")
+    .select(
+      "name, phone, city, postal_code, street, company_name, website, about, opening_hours, vat_id, services, logo_url, legal_form, register_court, register_number, public_email, represented_by, role, created_at",
+    )
     .eq("id", userId)
     .maybeSingle();
   const business = isBusinessRole(readString(data?.role));
@@ -204,6 +206,12 @@ export async function accountProfile(userId: string): Promise<AccountProfile> {
     openingHours: readString(data?.opening_hours) ?? "",
     vatId: readString(data?.vat_id) ?? "",
     services: readServices(data?.services),
+    logoUrl: readString(data?.logo_url) ?? "",
+    legalForm: readString(data?.legal_form) ?? "",
+    registerCourt: readString(data?.register_court) ?? "",
+    registerNumber: readString(data?.register_number) ?? "",
+    publicEmail: readString(data?.public_email) ?? "",
+    representedBy: readString(data?.represented_by) ?? "",
   };
 
   return {

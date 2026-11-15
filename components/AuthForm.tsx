@@ -60,14 +60,14 @@ export function AuthForm({ mode, nextPath, notice }: AuthFormProps) {
               <label className="flex items-start gap-3 rounded-xl border border-line bg-card px-3 py-3 text-sm">
                 <input type="radio" name="role" value="privat" defaultChecked className="mt-1" />
                 <span>
-                  <span className="font-semibold">Privat</span>
+                  <span className="font-semibold">Ich bin Privatverkäufer</span>
                   <span className="mt-0.5 block text-muted">Kaufen und verkaufen. Ein Inserat kostet 4,99 € für 30 Tage.</span>
                 </span>
               </label>
               <label className="flex items-start gap-3 rounded-xl border border-line bg-card px-3 py-3 text-sm">
                 <input type="radio" name="role" value="haendler" className="mt-1" />
                 <span>
-                  <span className="font-semibold">Händler</span>
+                  <span className="font-semibold">Ich bin Händler</span>
                   <span className="mt-0.5 block text-muted">
                     Gewerbe mit eigener Händlerseite. Ein Inserat kostet 6,99 € für 30 Tage.
                   </span>

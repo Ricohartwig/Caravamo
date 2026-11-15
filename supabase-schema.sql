@@ -455,6 +455,12 @@ alter table public.users add column if not exists about text;
 alter table public.users add column if not exists opening_hours text;
 alter table public.users add column if not exists vat_id text;
 alter table public.users add column if not exists services text[] not null default '{}';
+alter table public.users add column if not exists logo_url text;
+alter table public.users add column if not exists legal_form text;
+alter table public.users add column if not exists register_court text;
+alter table public.users add column if not exists register_number text;
+alter table public.users add column if not exists public_email text;
+alter table public.users add column if not exists represented_by text;
 
 alter table public.users drop constraint if exists users_postal_code_shape;
 alter table public.users add constraint users_postal_code_shape
@@ -488,11 +494,38 @@ alter table public.users drop constraint if exists users_services_known;
 alter table public.users add constraint users_services_known
   check (services <@ array['finanzierung','inzahlungnahme','werkstatt','lieferung']::text[]);
 
+alter table public.users drop constraint if exists users_logo_url_shape;
+alter table public.users add constraint users_logo_url_shape
+  check (logo_url is null or logo_url ~ '^https://[^[:space:]]{1,280}$');
+
+alter table public.users drop constraint if exists users_legal_form_known;
+alter table public.users add constraint users_legal_form_known
+  check (legal_form is null or legal_form in (
+    'Einzelunternehmen', 'e.K.', 'GbR', 'UG (haftungsbeschränkt)', 'GmbH', 'GmbH & Co. KG', 'AG', 'OHG', 'KG'
+  ));
+
+alter table public.users drop constraint if exists users_register_court_length;
+alter table public.users add constraint users_register_court_length
+  check (register_court is null or char_length(register_court) between 2 and 80);
+
+alter table public.users drop constraint if exists users_register_number_length;
+alter table public.users add constraint users_register_number_length
+  check (register_number is null or char_length(register_number) between 2 and 40);
+
+alter table public.users drop constraint if exists users_public_email_shape;
+alter table public.users add constraint users_public_email_shape
+  check (public_email is null or public_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$');
+
+alter table public.users drop constraint if exists users_represented_by_length;
+alter table public.users add constraint users_represented_by_length
+  check (represented_by is null or char_length(represented_by) between 2 and 80);
+
 create or replace view public.seller_profiles as
 select id, name, role, city, postal_code, company_name, about
 from public.users;
 
-create or replace view public.dealer_profiles as
+drop view if exists public.dealer_profiles;
+create view public.dealer_profiles as
 select
   id,
   company_name,
@@ -506,6 +539,12 @@ select
   opening_hours,
   vat_id,
   services,
+  logo_url,
+  legal_form,
+  register_court,
+  register_number,
+  public_email,
+  represented_by,
   created_at
 from public.users
 where lower(coalesce(role, '')) in ('haendler', 'händler')

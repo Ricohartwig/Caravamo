@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Globe, MapPin, Phone } from "lucide-react";
+import { Clock, Globe, Mail, MapPin, Phone } from "lucide-react";
 import { VehicleCard } from "@/components/VehicleCard";
 import { dealerJsonLd, getDealer, listDealerOffers, type PublicDealer } from "@/lib/dealers";
 import { formatDay, formatOfferCount } from "@/lib/format";
@@ -31,7 +32,14 @@ export async function generateMetadata({ params }: PageProps<"/haendler/[id]">):
     title: { absolute: `${dealer.companyName} in ${dealer.city}` },
     description,
     alternates: { canonical: path },
-    openGraph: { title: dealer.companyName, description, url: path, type: "website", locale: "de_DE" },
+    openGraph: {
+      title: dealer.companyName,
+      description,
+      url: path,
+      type: "website",
+      locale: "de_DE",
+      images: dealer.logoUrl ? [{ url: dealer.logoUrl, alt: `Logo von ${dealer.companyName}` }] : undefined,
+    },
   };
 }
 
@@ -68,11 +76,24 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
         </Link>
       </p>
       <p className="mt-3 text-sm font-medium text-copper-dark">Händler</p>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">{dealer.companyName}</h1>
-      <p className="mt-2 text-muted">
-        Ansprechpartner {dealer.contactName}
-        {dealer.memberSince ? ` · dabei seit ${formatDay(dealer.memberSince)}` : ""}
-      </p>
+      <div className="mt-1 flex items-start gap-4">
+        {dealer.logoUrl ? (
+          <Image
+            src={dealer.logoUrl}
+            alt={`Logo von ${dealer.companyName}`}
+            width={96}
+            height={96}
+            className="size-20 shrink-0 rounded-2xl border border-line bg-card object-contain p-2 sm:size-24"
+          />
+        ) : null}
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{dealer.companyName}</h1>
+          <p className="mt-2 text-muted">
+            Ansprechpartner {dealer.contactName}
+            {dealer.memberSince ? ` · dabei seit ${formatDay(dealer.memberSince)}` : ""}
+          </p>
+        </div>
+      </div>
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           {dealer.about ? (
@@ -90,6 +111,7 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
               ))}
             </ul>
           ) : null}
+          <Impressum dealer={dealer} address={address} />
           <section className="mt-8">
             <h2 className="text-lg font-semibold">Angebote</h2>
             {offers.length === 0 ? (
@@ -145,5 +167,52 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
         </aside>
       </div>
     </article>
+  );
+}
+
+function Impressum({ dealer, address }: { dealer: PublicDealer; address: string[] }) {
+  const rows = [
+    ["Firma", dealer.companyName],
+    ["Rechtsform", dealer.legalForm],
+    ["Anschrift", address.join(", ") || null],
+    ["Telefon", dealer.phone],
+    ["E-Mail", dealer.publicEmail],
+    ["Website", dealer.website],
+    ["Vertreten durch", dealer.representedBy],
+    ["Registergericht", dealer.registerCourt],
+    ["Registernummer", dealer.registerNumber],
+    ["USt-IdNr.", dealer.vatId],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+
+  return (
+    <section className="mt-8" id="impressum">
+      <h2 className="text-lg font-semibold">Impressum</h2>
+      <dl className="mt-3 max-w-3xl divide-y divide-line rounded-2xl border border-line bg-card">
+        {rows.map(([term, value]) => (
+          <div key={term} className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-4">
+            <dt className="text-sm text-muted">{term}</dt>
+            <dd className="text-sm">
+              {term === "E-Mail" ? (
+                <a href={`mailto:${value}`} className="inline-flex items-center gap-2 font-semibold text-pine hover:underline">
+                  <Mail aria-hidden="true" className="size-4" />
+                  {value}
+                </a>
+              ) : term === "Website" ? (
+                <a href={value} className="font-semibold text-pine hover:underline" rel="noreferrer">
+                  {value.replace(/^https:\/\//, "")}
+                </a>
+              ) : term === "Telefon" ? (
+                <a href={`tel:${value.replace(/\s+/g, "")}`} className="font-semibold text-pine hover:underline">
+                  {value}
+                </a>
+              ) : (
+                value
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-sm text-muted">Angaben des Händlers. Caravamo prüft das Impressum nicht.</p>
+    </section>
   );
 }

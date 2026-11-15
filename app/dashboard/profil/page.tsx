@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateProfile } from "@/actions/account";
 import { accountProfile, currentUser, type AccountProfile } from "@/lib/account";
-import { dealerServiceOptions } from "@/lib/profile";
+import { LogoField } from "@/components/account/LogoField";
+import { dealerServiceOptions, legalForms, profileSlotCount } from "@/lib/profile";
 
 export const metadata: Metadata = {
   title: "Profil",
@@ -24,6 +25,11 @@ const notices: Record<string, string> = {
   hours: "Die Öffnungszeiten dürfen höchstens 240 Zeichen haben.",
   vat: "Die USt-IdNr. hat die Form DE und neun Ziffern.",
   services: "Diese Leistung gibt es nicht.",
+  logo: "Das Logo muss ein Bild aus deinem Konto sein.",
+  "public-email": "Bitte gib eine gültige E-Mail für das Impressum an.",
+  legal: "Bitte wähle eine Rechtsform aus der Liste.",
+  register: "Registergericht und Registernummer sind zu lang oder enthalten ungültige Zeichen.",
+  represented: "„Vertreten durch“ braucht 2 bis 80 Zeichen.",
   fehler: "Das Profil konnte nicht gespeichert werden.",
 };
 
@@ -50,7 +56,7 @@ async function Profile({ searchParams }: { searchParams: Promise<{ hinweis?: str
   const params = await searchParams;
   const noticeKey = Array.isArray(params.hinweis) ? params.hinweis[0] : params.hinweis;
   const profile = await accountProfile(user.id);
-  const total = profile.business ? 10 : 5;
+  const total = profileSlotCount(profile.business);
   const done = total - profile.gaps.length;
 
   return (
@@ -123,6 +129,7 @@ function BusinessFields({ profile }: { profile: AccountProfile }) {
         <TextField id="profil-company" name="company_name" label="Firmenname" maxLength={120} defaultValue={profile.companyName} autoComplete="organization" />
         <TextField id="profil-vat" name="vat_id" label="USt-IdNr." maxLength={14} defaultValue={profile.vatId} placeholder="DE123456789" />
         <TextField id="profil-website" name="website" label="Website" type="url" maxLength={180} defaultValue={profile.website} placeholder="https://" autoComplete="url" />
+        <LogoField initialUrl={profile.logoUrl} />
         <fieldset>
           <legend className="text-sm font-medium">Leistungen</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -149,6 +156,29 @@ function BusinessFields({ profile }: { profile: AccountProfile }) {
           <TextField id="profil-city" name="city" label="Ort" maxLength={80} defaultValue={profile.city} autoComplete="address-level2" />
         </div>
         <p className="text-sm text-muted">Die Adresse ist auf der Händlerseite sichtbar.</p>
+      </section>
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Impressum</h2>
+        <p className="text-sm text-muted">
+          Diese Angaben stehen auf der öffentlichen Händlerseite. Die E-Mail deiner Anmeldung bleibt privat.
+        </p>
+        <label htmlFor="profil-legal" className="block text-sm font-medium">
+          Rechtsform
+          <select id="profil-legal" name="legal_form" defaultValue={profile.legalForm} className={fieldClassName}>
+            <option value="">Bitte wählen</option>
+            {legalForms.map((form) => (
+              <option key={form} value={form}>
+                {form}
+              </option>
+            ))}
+          </select>
+        </label>
+        <TextField id="profil-represented" name="represented_by" label="Vertreten durch" maxLength={80} defaultValue={profile.representedBy} placeholder="Vor- und Nachname, Funktion" />
+        <TextField id="profil-public-email" name="public_email" label="E-Mail im Impressum" type="email" maxLength={254} defaultValue={profile.publicEmail} autoComplete="email" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField id="profil-court" name="register_court" label="Registergericht" maxLength={80} defaultValue={profile.registerCourt} placeholder="Amtsgericht Musterstadt" />
+          <TextField id="profil-register" name="register_number" label="Registernummer" maxLength={40} defaultValue={profile.registerNumber} placeholder="HRB 12345" />
+        </div>
       </section>
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Händlerseite</h2>

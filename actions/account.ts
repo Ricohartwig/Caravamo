@@ -323,7 +323,7 @@ export async function markInquiryRead(inquiryId: string, userId: string): Promis
 export async function updateProfile(formData: FormData): Promise<void> {
   const user = await requireAccount("/dashboard/profil");
   const profile = await accountProfile(user.id);
-  const parsed = parseProfile(formData, profile.business);
+  const parsed = parseProfile(formData, profile.business, user.id);
   if (!parsed.ok) {
     redirect(`/dashboard/profil?hinweis=${parsed.code}`);
   }
