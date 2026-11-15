@@ -17,6 +17,7 @@ const extensions: Record<string, string> = {
 export type UploadedImage = {
   path: string;
   previewUrl: string;
+  persisted?: boolean;
 };
 
 type ImageUploadProps = {
@@ -61,6 +62,10 @@ export function ImageUpload({ images, onChange, onPendingChange }: ImageUploadPr
 
   async function removeImage(image: UploadedImage) {
     onChange(images.filter((entry) => entry.path !== image.path));
+    if (image.persisted) {
+      return;
+    }
+
     const supabase = createClient();
     await supabase.storage.from("vehicle-images").remove([image.path]);
   }

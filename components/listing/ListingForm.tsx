@@ -3,7 +3,7 @@
 import { useState, type ChangeEvent } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch, type FieldErrors, type UseFormRegister } from "react-hook-form";
-import { createListing } from "@/actions/listings";
+import { createListing, updateListing } from "@/actions/listings";
 import { bodyOptions, isFieldVisible, listingSections, type ListingField } from "@/lib/listing-sections";
 import { listingDefaults, listingFormSchema, type ListingFormInput, type ListingOutput } from "@/lib/listing-schema";
 import { ImageUpload, type UploadedImage } from "@/components/listing/ImageUpload";
@@ -11,8 +11,14 @@ import { ImageUpload, type UploadedImage } from "@/components/listing/ImageUploa
 const fieldClassName =
   "mt-1.5 w-full rounded-xl border border-line bg-foam px-3 py-3 text-base text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
 
-export function ListingForm() {
-  const [images, setImages] = useState<UploadedImage[]>([]);
+type ListingFormProps = {
+  listingId?: string;
+  initialValues?: ListingFormInput;
+  initialImages?: UploadedImage[];
+};
+
+export function ListingForm({ listingId, initialValues, initialImages = [] }: ListingFormProps) {
+  const [images, setImages] = useState<UploadedImage[]>(initialImages);
   const [uploading, setUploading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -23,7 +29,7 @@ export function ListingForm() {
     formState: { errors, isSubmitting },
   } = useForm<ListingFormInput, unknown, ListingOutput>({
     resolver: zodResolver(listingFormSchema),
-    defaultValues: listingDefaults,
+    defaultValues: initialValues ?? listingDefaults,
   });
   const category = useWatch({ control, name: "category" });
   const grossWeight = useWatch({ control, name: "gross_weight_kg" });
@@ -33,10 +39,11 @@ export function ListingForm() {
 
   async function onSubmit(values: ListingOutput) {
     setFormError(null);
-    const result = await createListing({
+    const payload = {
       ...values,
       images: images.map((image) => ({ path: image.path })),
-    });
+    };
+    const result = listingId ? await updateListing(listingId, payload) : await createListing(payload);
     if (result?.error) {
       setFormError(result.error);
     }
@@ -86,7 +93,7 @@ export function ListingForm() {
         disabled={isSubmitting || uploading}
         className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-copper-dark px-5 text-sm font-semibold text-foam hover:bg-copper disabled:opacity-70 sm:w-auto"
       >
-        {isSubmitting ? "Inserat wird gespeichert" : "Inserat veröffentlichen"}
+        {isSubmitting ? "Inserat wird gespeichert" : listingId ? "Änderungen speichern" : "Inserat veröffentlichen"}
       </button>
     </form>
   );
