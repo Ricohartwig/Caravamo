@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { connection } from "next/server";
 import { blankFilters, camperFilterActive, type VehicleFilters } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
@@ -134,11 +135,63 @@ function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, (char) => `\\${char}`);
 }
 
-export async function getPublishedListing(id: string): Promise<PublishedListing | null> {
+export type SitemapListing = {
+  id: string;
+  updatedAt: string | null;
+  imageUrls: string[];
+};
+
+export async function listSitemapListings(): Promise<SitemapListing[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+
+  await connection();
+  const now = new Date().toISOString();
+  const supabase = await createClient();
+  const pageSize = 1000;
+  const listings: SitemapListing[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select("id, created_at, vehicle_images(url, is_main)")
+      .eq("status", "aktiv")
+      .or(`published_until.is.null,published_until.gt."${now}"`)
+      .order("created_at", { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error || !Array.isArray(data)) {
+      break;
+    }
+
+    for (const row of data) {
+      if (!isRecord(row) || typeof row.id !== "string") {
+        continue;
+      }
+
+      listings.push({
+        id: row.id,
+        updatedAt: readString(row.created_at),
+        imageUrls: imageUrls(row.vehicle_images).filter((url) => url.startsWith("https://")),
+      });
+    }
+
+    if (data.length < pageSize) {
+      break;
+    }
+  }
+
+  return listings;
+}
+
+export const getPublishedListing = cache(async (id: string): Promise<PublishedListing | null> => {
   if (!isSupabaseConfigured()) {
     return null;
   }
 
+  await connection();
+  const now = Date.now();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
@@ -149,7 +202,7 @@ export async function getPublishedListing(id: string): Promise<PublishedListing 
   if (
     error ||
     !isRecord(data) ||
-    !isPublicListing(readString(data.status) ?? "", readString(data.published_until))
+    !isPublicListing(readString(data.status) ?? "", readString(data.published_until), now)
   ) {
     return null;
   }
@@ -179,7 +232,7 @@ export async function getPublishedListing(id: string): Promise<PublishedListing 
     sellerCity: seller.city,
     values: { ...data, ...(details ?? {}) },
   };
-}
+});
 
 async function readSeller(
   userId: string | null,

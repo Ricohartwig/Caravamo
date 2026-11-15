@@ -3,15 +3,46 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublishedExpose } from "@/components/PublishedExpose";
 import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
+import { listingDescription, listingTitle } from "@/lib/listing-seo";
 import { getPublishedListing } from "@/lib/published-listings";
-
-export const metadata: Metadata = {
-  title: "Fahrzeug",
-  description: "Exposé eines Fahrzeugs auf Caravamo.",
-};
 
 const vehicleIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const hiddenListing: Metadata = {
+  title: "Fahrzeug nicht gefunden",
+  robots: { index: false, follow: false },
+};
+
+export async function generateMetadata({ params }: PageProps<"/fahrzeug/[id]">): Promise<Metadata> {
+  const { id } = await params;
+  if (!vehicleIdPattern.test(id)) {
+    return hiddenListing;
+  }
+
+  const listing = await getPublishedListing(id);
+  if (!listing) {
+    return hiddenListing;
+  }
+
+  const title = listingTitle(listing);
+  const description = listingDescription(listing);
+  const path = `/fahrzeug/${listing.id}`;
+
+  return {
+    title: { absolute: title },
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title,
+      description,
+      url: path,
+      type: "website",
+      locale: "de_DE",
+      images: listing.imageUrls.slice(0, 4).map((url) => ({ url, alt: listing.title })),
+    },
+  };
+}
 
 export default function VehiclePage({ params }: PageProps<"/fahrzeug/[id]">) {
   return (

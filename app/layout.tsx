@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { VehicleStructuredData } from "@/components/VehicleStructuredData";
+import { siteOrigin } from "@/lib/site";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
 import "./globals.css";
@@ -14,6 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin()),
   title: {
     default: "Caravamo",
     template: "%s · Caravamo",
@@ -25,6 +28,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="de" className={`${inter.variable} h-full antialiased`}>
+      <head>
+        <Suspense fallback={null}>
+          <VehicleStructuredData />
+        </Suspense>
+      </head>
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
         <a
           href="#inhalt"
