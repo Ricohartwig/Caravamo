@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Caravan, Store, Search } from "lucide-react";
 import { SearchBox } from "@/components/SearchBox";
-import { vehicleTypes } from "@/lib/vehicles";
+import { VehicleCard } from "@/components/VehicleCard";
+import { listingCategories } from "@/lib/listing-options";
+import { listNewestOffers } from "@/lib/published-listings";
 
 const steps = [
   {
@@ -33,15 +36,15 @@ export default function HomePage() {
             Fahrzeuge, die zur Strecke passen.
           </h1>
           <p className="mt-4 max-w-xl text-lg leading-8 text-foam/85">
-            Wohnmobile, Wohnwagen, Pkw und Transporter von Privat und Händlern.
+            Wohnmobile, Wohnwagen, Dachzelte und Kabinen von Privat und Händlern.
             Die Suche führt direkt in die Angebote.
           </p>
           <SearchBox />
           <ul className="mt-4 flex flex-wrap gap-2">
-            {vehicleTypes.map((type) => (
+            {listingCategories.map((type) => (
               <li key={type}>
                 <Link
-                  href={`/suche?typ=${encodeURIComponent(type)}`}
+                  href={`/suche?type=${encodeURIComponent(type)}`}
                   className="inline-flex rounded-full border border-white/30 px-3 py-1.5 text-sm text-foam hover:bg-white/10"
                 >
                   {type}
@@ -72,6 +75,47 @@ export default function HomePage() {
           </article>
         ))}
       </section>
+
+      <section className="mx-auto max-w-6xl px-4 pb-16">
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight">Neueste Inserate</h2>
+          <Link href="/suche" className="text-sm font-medium text-pine hover:underline">
+            Alle ansehen
+          </Link>
+        </div>
+        <Suspense fallback={<p className="mt-4 text-sm text-muted">Inserate werden geladen.</p>}>
+          <NewestListings />
+        </Suspense>
+      </section>
     </>
+  );
+}
+
+async function NewestListings() {
+  const offers = await listNewestOffers(6);
+
+  if (offers.length === 0) {
+    return (
+      <div className="mt-4 rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center">
+        <p className="text-lg font-semibold">Noch keine Inserate</p>
+        <p className="mt-2 text-sm text-muted">Das erste Fahrzeug erscheint hier, sobald es veröffentlicht ist.</p>
+        <Link
+          href="/inserieren"
+          className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-copper-dark px-4 text-sm font-semibold text-foam"
+        >
+          Fahrzeug inserieren
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {offers.map((vehicle) => (
+        <li key={vehicle.id}>
+          <VehicleCard vehicle={vehicle} />
+        </li>
+      ))}
+    </ul>
   );
 }

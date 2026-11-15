@@ -1,3 +1,4 @@
+import type { VehicleFilters } from "@/lib/filters";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
 
@@ -27,18 +28,57 @@ export type PublishedListing = {
   values: Record<string, unknown>;
 };
 
-export async function listOfferCards(): Promise<OfferCard[]> {
+const emptyFilters: VehicleFilters = {
+  brand: "",
+  model: "",
+  type: "",
+  body: "",
+  priceMin: null,
+  priceMax: null,
+};
+
+export async function listNewestOffers(limit = 6): Promise<OfferCard[]> {
+  return searchOffers(emptyFilters, limit);
+}
+
+export async function searchOffers(filters: VehicleFilters, limit = 48): Promise<OfferCard[]> {
   if (!isSupabaseConfigured()) {
     return [];
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const details = filters.body
+    ? "vehicle_camper_details!inner(body_type)"
+    : "vehicle_camper_details(body_type)";
+  let query = supabase
     .from("vehicles")
-    .select("id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main)")
+    .select(
+      `id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main), ${details}`,
+    )
     .eq("status", "aktiv")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
+  if (filters.brand) {
+    query = query.ilike("brand", escapeLike(filters.brand));
+  }
+  if (filters.model) {
+    query = query.ilike("model", escapeLike(filters.model));
+  }
+  if (filters.type) {
+    query = query.eq("type", filters.type);
+  }
+  if (filters.body) {
+    query = query.eq("vehicle_camper_details.body_type", filters.body);
+  }
+  if (filters.priceMin !== null) {
+    query = query.gte("price", filters.priceMin);
+  }
+  if (filters.priceMax !== null) {
+    query = query.lte("price", filters.priceMax);
+  }
+
+  const { data, error } = await query;
   if (error || !Array.isArray(data)) {
     return [];
   }
@@ -47,6 +87,10 @@ export async function listOfferCards(): Promise<OfferCard[]> {
     const card = toOfferCard(row);
     return card ? [card] : [];
   });
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[%_\\]/g, (char) => `\\${char}`);
 }
 
 export async function getPublishedListing(id: string): Promise<PublishedListing | null> {

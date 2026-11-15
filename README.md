@@ -2,7 +2,7 @@
 
 Caravamo by CarWo Marketplace
 
-Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Die Suche zeigt Beispielangebote und veröffentlichte Inserate. Angemeldete Nutzer stellen Fahrzeuge über `/inserieren` ein.
+Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Startseite und Suche zeigen veröffentlichte Inserate aus Supabase. Angemeldete Nutzer stellen Fahrzeuge über `/inserieren` ein.
 
 ## Start
 

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s · Caravamo",
   },
   description:
-    "Caravamo ist der Marktplatz für Wohnmobile, Wohnwagen, Pkw und Transporter von Privat und Händlern.",
+    "Caravamo ist der Marktplatz für Wohnmobile, Wohnwagen, Dachzelte und Kabinen von Privat und Händlern.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
