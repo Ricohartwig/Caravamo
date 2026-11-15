@@ -138,6 +138,17 @@ function AccountLinks({
       <p className="max-w-40 truncate text-sm text-muted" title={user.email}>
         {user.email}
       </p>
+      <Link
+        href="/dashboard"
+        onClick={onNavigate}
+        className={
+          stacked
+            ? "block rounded-xl px-3 py-3 text-base font-medium hover:bg-sand"
+            : "text-sm font-semibold text-foreground hover:text-pine"
+        }
+      >
+        Meine Inserate
+      </Link>
       <form action={signOut}>
         <button
           type="submit"

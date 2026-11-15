@@ -4,7 +4,11 @@ import { getSupabaseEnv, isSupabaseConfigured } from "@/utils/supabase/env";
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const needsAccount = pathname === "/inserieren" || pathname.startsWith("/inserieren/");
+  const needsAccount =
+    pathname === "/inserieren" ||
+    pathname.startsWith("/inserieren/") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/");
 
   if (!isSupabaseConfigured()) {
     if (!needsAccount) {
