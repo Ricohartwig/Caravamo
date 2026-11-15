@@ -6,6 +6,7 @@ import { PublishedExpose } from "@/components/PublishedExpose";
 import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
 import { listingDescription, listingTitle } from "@/lib/listing-seo";
 import { getPublishedListing } from "@/lib/published-listings";
+import { createPublicClient } from "@/utils/supabase/public";
 
 const vehicleIdPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,6 +72,9 @@ async function VehicleExpose({
   const viewer = await currentUser();
   if (viewer && viewer.id !== listing.sellerId) {
     await rememberView(viewer.id, listing.id);
+  }
+  if (!viewer || viewer.id !== listing.sellerId) {
+    await createPublicClient().rpc("bump_listing_view", { listing_id: listing.id });
   }
 
   const saved = viewer ? await loadCardMarks(`/fahrzeug/${listing.id}`) : null;

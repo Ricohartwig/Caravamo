@@ -5,6 +5,8 @@ import { SellerContact } from "@/components/SellerContact";
 import { VehiclePlaceholder } from "@/components/VehiclePlaceholder";
 import type { CardMarks } from "@/lib/account";
 import { formatPrice } from "@/lib/format";
+import { isPublicListing } from "@/lib/listing-payment";
+import { listingStand } from "@/lib/listing-state";
 import type { PublishedListing } from "@/lib/published-listings";
 
 export function PublishedExpose({
@@ -19,6 +21,9 @@ export function PublishedExpose({
   const price = listing.priceTax
     ? `${formatPrice(listing.price)} ${listing.priceTax}`
     : formatPrice(listing.price);
+  const status = typeof listing.values.status === "string" ? listing.values.status : "aktiv";
+  const publishedUntil = typeof listing.values.published_until === "string" ? listing.values.published_until : null;
+  const badge = exposeBadge(status, publishedUntil);
 
   return (
     <article className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
@@ -31,7 +36,7 @@ export function PublishedExpose({
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">{listing.title}</h1>
-        <p className="rounded-full bg-sand px-2.5 py-1 text-xs font-medium text-pine">Inserat aktiv</p>
+        {badge ? <p className="rounded-full bg-sand px-2.5 py-1 text-xs font-medium text-pine">{badge}</p> : null}
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight">{price}</p>
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -63,4 +68,22 @@ export function PublishedExpose({
       </div>
     </article>
   );
+}
+
+function exposeBadge(status: string, publishedUntil: string | null): string | null {
+  if (isPublicListing(status, publishedUntil)) {
+    return "Inserat aktiv";
+  }
+
+  const stand = listingStand(status, publishedUntil);
+  if (stand === "inaktiv") {
+    return "Pausiert";
+  }
+  if (stand === "verkauft") {
+    return "Verkauft";
+  }
+  if (stand === "abgelaufen") {
+    return "Abgelaufen";
+  }
+  return "Entwurf";
 }

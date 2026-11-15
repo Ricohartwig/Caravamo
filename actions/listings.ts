@@ -6,7 +6,7 @@ import { isListingCategory } from "@/lib/listing-options";
 import { hideIrrelevant } from "@/lib/listing-sections";
 import { listingSubmitSchema, type NormalizedListing } from "@/lib/listing-schema";
 import { beginCheckout } from "@/actions/checkout";
-import { isPublicListing } from "@/lib/listing-payment";
+import { canMarkSold, canPause, canResume, listingNeedsPayment } from "@/lib/listing-state";
 import { isVehicleId } from "@/lib/owned-listings";
 import { publicImageUrl, storagePathFromPublicUrl } from "@/lib/vehicle-images";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -128,11 +128,103 @@ export async function updateListing(id: string, input: unknown): Promise<{ error
   refreshListing(id);
   const status = typeof owned.status === "string" ? owned.status : "entwurf";
   const publishedUntil = typeof owned.published_until === "string" ? owned.published_until : null;
-  if (isPublicListing(status, publishedUntil)) {
-    redirect(`/fahrzeug/${id}`);
+  if (!listingNeedsPayment(status, publishedUntil)) {
+    redirect(status === "aktiv" ? `/fahrzeug/${id}` : `/vorschau/${id}`);
   }
 
   await beginCheckout(id);
+}
+
+export async function setListingState(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  const next = String(formData.get("status") ?? "");
+  const backToPreview = formData.get("return") === "vorschau";
+  const fail = (code: string) => redirect(listingReturn(id, backToPreview, code));
+
+  if (!isVehicleId(id) || (next !== "aktiv" && next !== "inaktiv" && next !== "verkauft")) {
+    fail("nicht-moeglich");
+  }
+
+  const owned = await ownedListing(id);
+  if (!owned) {
+    redirect("/dashboard/inserate?hinweis=unbekannt");
+  }
+
+  const allowed =
+    (next === "inaktiv" && canPause(owned.status, owned.publishedUntil)) ||
+    (next === "aktiv" && canResume(owned.status, owned.publishedUntil)) ||
+    (next === "verkauft" && canMarkSold(owned.status, owned.publishedUntil));
+  if (!allowed) {
+    fail("nicht-moeglich");
+  }
+
+  const { error } = await owned.supabase.from("vehicles").update({ status: next }).eq("id", id).eq("user_id", owned.userId);
+  refreshListing(id);
+  const code = error ? "nicht-moeglich" : next === "aktiv" ? "online" : next === "inaktiv" ? "pausiert" : "verkauft";
+  redirect(listingReturn(id, backToPreview, code));
+}
+
+export async function duplicateListing(formData: FormData): Promise<void> {
+  const id = String(formData.get("id") ?? "");
+  if (!isVehicleId(id)) {
+    redirect("/dashboard/inserate?hinweis=kopie-fehler");
+  }
+
+  const owned = await ownedListing(id);
+  if (!owned) {
+    redirect("/dashboard/inserate?hinweis=unbekannt");
+  }
+
+  const { data: vehicle, error: vehicleError } = await owned.supabase
+    .from("vehicles")
+    .select("brand, model, type, price, mileage, year, description, condition, price_tax, availability, previous_owners, service_record, next_inspection, next_gas_inspection, speed_100, first_registration")
+    .eq("id", id)
+    .eq("user_id", owned.userId)
+    .maybeSingle();
+  if (vehicleError || !vehicle) {
+    redirect("/dashboard/inserate?hinweis=kopie-fehler");
+  }
+
+  const { data: copy, error: copyError } = await owned.supabase
+    .from("vehicles")
+    .insert({ user_id: owned.userId, status: "entwurf", ...vehicle })
+    .select("id")
+    .single();
+  if (copyError || !copy || typeof copy.id !== "string") {
+    redirect("/dashboard/inserate?hinweis=kopie-fehler");
+  }
+
+  const { data: details } = await owned.supabase.from("vehicle_camper_details").select("*").eq("vehicle_id", id).maybeSingle();
+  if (details && typeof details === "object") {
+    const { payload_kg: _payload, vehicle_id: _vehicleId, ...columns } = details as Record<string, unknown>;
+    const { error: detailError } = await owned.supabase
+      .from("vehicle_camper_details")
+      .insert({ ...columns, vehicle_id: copy.id });
+    if (detailError) {
+      await owned.supabase.from("vehicles").delete().eq("id", copy.id);
+      redirect("/dashboard/inserate?hinweis=kopie-fehler");
+    }
+  }
+
+  const { data: images } = await owned.supabase.from("vehicle_images").select("url, is_main").eq("vehicle_id", id);
+  if (Array.isArray(images) && images.length > 0) {
+    const rows = images.flatMap((image) => {
+      if (!image || typeof image.url !== "string" || image.url === "") {
+        return [];
+      }
+      return [{ vehicle_id: copy.id, url: image.url, is_main: image.is_main === true }];
+    });
+    if (rows.length > 0) {
+      const { error: imageError } = await owned.supabase.from("vehicle_images").insert(rows);
+      if (imageError) {
+        await owned.supabase.from("vehicles").delete().eq("id", copy.id);
+        redirect("/dashboard/inserate?hinweis=kopie-fehler");
+      }
+    }
+  }
+
+  refreshListing(copy.id);
+  redirect(`/inserieren/${copy.id}`);
 }
 
 export async function deleteListing(
@@ -176,8 +268,29 @@ export async function deleteListing(
     return { error: "Das Inserat konnte nicht gelöscht werden." };
   }
 
+  const stillUsed = new Set<string>();
   if (paths.length > 0) {
-    const removed = await supabase.storage.from("vehicle-images").remove(paths);
+    const urls = imageUrlsFrom(owned.vehicle_images);
+    const { data: remaining } = await supabase.from("vehicle_images").select("url").in("url", urls);
+    if (Array.isArray(remaining)) {
+      for (const row of remaining) {
+        if (row && typeof row.url === "string") {
+          stillUsed.add(row.url);
+        }
+      }
+    }
+  }
+
+  const removable = imageUrlsFrom(owned.vehicle_images).flatMap((url) => {
+    if (stillUsed.has(url)) {
+      return [];
+    }
+    const path = storagePathFromPublicUrl(url, user.id);
+    return path ? [path] : [];
+  });
+
+  if (removable.length > 0) {
+    const removed = await supabase.storage.from("vehicle-images").remove(removable);
     if (removed.error) {
       return { error: "Das Inserat ist gelöscht, ein Bild blieb im Speicher." };
     }
@@ -333,10 +446,55 @@ function imageUrlsFrom(value: unknown): string[] {
   });
 }
 
+async function ownedListing(id: string): Promise<{
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  status: string;
+  publishedUntil: string | null;
+} | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData.user;
+  if (!user) {
+    redirect(`/login?next=/dashboard/inserate`);
+  }
+
+  const { data, error } = await supabase
+    .from("vehicles")
+    .select("status, published_until")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    supabase,
+    userId: user.id,
+    status: typeof data.status === "string" ? data.status : "entwurf",
+    publishedUntil: typeof data.published_until === "string" ? data.published_until : null,
+  };
+}
+
+function listingReturn(id: string, preview: boolean, code: string): string {
+  if (preview && isVehicleId(id)) {
+    return `/vorschau/${id}?hinweis=${code}`;
+  }
+
+  return `/dashboard/inserate?hinweis=${code}`;
+}
+
 function refreshListing(id: string) {
   revalidatePath("/");
   revalidatePath("/suche");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/inserate");
   revalidatePath(`/fahrzeug/${id}`);
+  revalidatePath(`/vorschau/${id}`);
   revalidatePath(`/inserieren/${id}`);
 }

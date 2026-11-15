@@ -1,5 +1,5 @@
 import { listingFormValues } from "@/lib/listing-form-values";
-import { isPublicListing } from "@/lib/listing-payment";
+import { paidTimeLeft } from "@/lib/listing-state";
 import type { ListingFormInput } from "@/lib/listing-schema";
 import { storagePathFromPublicUrl } from "@/lib/vehicle-images";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -13,6 +13,10 @@ export type OwnedVehicle = {
   status: string;
   publishedUntil: string | null;
   imageUrl: string | null;
+  createdAt: string | null;
+  viewCount: number;
+  inquiryCount: number;
+  saveCount: number;
 };
 
 export type OwnedDraft = {
@@ -31,13 +35,18 @@ export function isVehicleId(value: string): boolean {
 }
 
 export function listingsExpiringWithin(vehicles: OwnedVehicle[], days = 7): OwnedVehicle[] {
-  const soon = Date.now() + days * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const soon = now + days * 24 * 60 * 60 * 1000;
   return vehicles.filter((vehicle) => {
-    if (!vehicle.publishedUntil || !isPublicListing(vehicle.status, vehicle.publishedUntil)) {
+    if (vehicle.status !== "aktiv" && vehicle.status !== "inaktiv") {
       return false;
     }
 
-    return new Date(vehicle.publishedUntil).getTime() <= soon;
+    if (!paidTimeLeft(vehicle.publishedUntil, now)) {
+      return false;
+    }
+
+    return new Date(vehicle.publishedUntil ?? "").getTime() <= soon;
   });
 }
 
@@ -49,13 +58,18 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("id, brand, model, type, price, status, published_until, vehicle_images(url, is_main)")
+    .select("id, brand, model, type, price, status, published_until, created_at, view_count, vehicle_images(url, is_main)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error || !Array.isArray(data)) {
     return [];
   }
+
+  const signals = await listingSignals(
+    supabase,
+    data.flatMap((row) => (isRecord(row) && typeof row.id === "string" ? [row.id] : [])),
+  );
 
   return data.flatMap((row) => {
     if (!isRecord(row) || typeof row.id !== "string") {
@@ -80,6 +94,10 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
         status: readString(row.status) ?? "entwurf",
         publishedUntil: readString(row.published_until),
         imageUrl: images[0]?.url ?? null,
+        createdAt: readString(row.created_at),
+        viewCount: readNumber(row.view_count) ?? 0,
+        inquiryCount: signals.get(row.id)?.inquiries ?? 0,
+        saveCount: signals.get(row.id)?.saves ?? 0,
       },
     ];
   });
@@ -119,8 +137,32 @@ export async function getOwnedDraft(userId: string, id: string): Promise<OwnedDr
   };
 }
 
-export function listingNeedsPayment(status: string, publishedUntil: string | null): boolean {
-  return !isPublicListing(status, publishedUntil);
+async function listingSignals(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<Map<string, { inquiries: number; saves: number }>> {
+  const signals = new Map<string, { inquiries: number; saves: number }>();
+  if (ids.length === 0) {
+    return signals;
+  }
+
+  const { data, error } = await supabase.rpc("owner_listing_signals", { listing_ids: ids });
+  if (error || !Array.isArray(data)) {
+    return signals;
+  }
+
+  for (const row of data) {
+    if (!isRecord(row) || typeof row.vehicle_id !== "string") {
+      continue;
+    }
+
+    signals.set(row.vehicle_id, {
+      inquiries: readNumber(row.inquiries) ?? 0,
+      saves: readNumber(row.saves) ?? 0,
+    });
+  }
+
+  return signals;
 }
 
 function imageEntries(value: unknown): { url: string; main: boolean }[] {
