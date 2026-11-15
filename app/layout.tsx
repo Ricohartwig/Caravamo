@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { isSupabaseConfigured } from "@/utils/supabase/env";
+import { createClient } from "@/utils/supabase/server";
 import "./globals.css";
 
 const inter = Inter({
@@ -29,7 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Zum Inhalt
         </a>
-        <Navbar />
+        <Suspense fallback={<Navbar user={null} />}>
+          <NavbarSlot />
+        </Suspense>
         <main id="inhalt" className="flex-1">
           {children}
         </main>
@@ -37,4 +42,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </body>
     </html>
   );
+}
+
+async function NavbarSlot() {
+  const email = await readSignedInEmail();
+  return <Navbar user={email ? { email } : null} />;
+}
+
+async function readSignedInEmail(): Promise<string | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getUser();
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
 }

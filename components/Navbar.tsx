@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { signOut } from "@/actions/auth";
+
+export type NavbarUser = {
+  email: string;
+};
 
 const links = [
   { href: "/suche", label: "Fahrzeuge suchen" },
   { href: "/haendler", label: "Für Händler" },
 ] as const;
 
-export function Navbar() {
+export function Navbar({ user }: { user: NavbarUser | null }) {
   const [open, setOpen] = useState(false);
 
   function closeMenu() {
@@ -46,18 +51,7 @@ export function Navbar() {
         </nav>
 
         <div className="ml-auto hidden items-center gap-3 md:flex">
-          <Link
-            href="/login"
-            className="text-sm font-semibold text-foreground hover:text-pine"
-          >
-            Login
-          </Link>
-          <Link
-            href="/inserieren"
-            className="inline-flex items-center rounded-xl bg-copper-dark px-3.5 py-2 text-sm font-semibold text-foam hover:bg-copper"
-          >
-            Fahrzeug inserieren
-          </Link>
+          <AccountLinks user={user} />
         </div>
 
         <button
@@ -96,26 +90,69 @@ export function Navbar() {
               </Link>
             </li>
           ))}
-          <li>
-            <Link
-              href="/login"
-              onClick={closeMenu}
-              className="block rounded-xl px-3 py-3 text-base font-medium hover:bg-sand"
-            >
-              Login
-            </Link>
-          </li>
-          <li className="pt-2">
-            <Link
-              href="/inserieren"
-              onClick={closeMenu}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-copper-dark px-3.5 py-3 text-sm font-semibold text-foam hover:bg-copper"
-            >
-              Fahrzeug inserieren
-            </Link>
+          <li className="px-3 py-2">
+            <AccountLinks user={user} stacked onNavigate={closeMenu} />
           </li>
         </ul>
       </nav>
     </header>
+  );
+}
+
+function AccountLinks({
+  user,
+  stacked = false,
+  onNavigate,
+}: {
+  user: NavbarUser | null;
+  stacked?: boolean;
+  onNavigate?: () => void;
+}) {
+  if (!user) {
+    return (
+      <>
+        <Link
+          href="/login"
+          onClick={onNavigate}
+          className={
+            stacked
+              ? "block rounded-xl px-3 py-3 text-base font-medium hover:bg-sand"
+              : "text-sm font-semibold text-foreground hover:text-pine"
+          }
+        >
+          Login
+        </Link>
+        <Link
+          href="/inserieren"
+          onClick={onNavigate}
+          className="inline-flex items-center justify-center rounded-xl bg-copper-dark px-3.5 py-2 text-sm font-semibold text-foam hover:bg-copper"
+        >
+          Fahrzeug inserieren
+        </Link>
+      </>
+    );
+  }
+
+  return (
+    <div className={stacked ? "flex flex-col gap-2" : "flex items-center gap-3"}>
+      <p className="max-w-40 truncate text-sm text-muted" title={user.email}>
+        {user.email}
+      </p>
+      <form action={signOut}>
+        <button
+          type="submit"
+          className="text-sm font-semibold text-foreground hover:text-pine"
+        >
+          Abmelden
+        </button>
+      </form>
+      <Link
+        href="/inserieren"
+        onClick={onNavigate}
+        className="inline-flex items-center justify-center rounded-xl bg-copper-dark px-3.5 py-2 text-sm font-semibold text-foam hover:bg-copper"
+      >
+        Fahrzeug inserieren
+      </Link>
+    </div>
   );
 }

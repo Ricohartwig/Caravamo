@@ -28,8 +28,8 @@ export default function InserierenPage() {
         Fahrzeug verkaufen, ohne Umwege.
       </h1>
       <p className="mt-4 text-lg leading-8 text-muted">
-        Privat und Gewerbe starten hier. In diesem Grundgerüst wird noch nichts
-        gespeichert. Der Button führt zu den nächsten Schritten.
+        Privat und Gewerbe starten hier. Diese Seite ist nur mit Anmeldung
+        erreichbar. Das Speichern des Inserats folgt im nächsten Schritt.
       </p>
       <a
         href="#einstellen"
