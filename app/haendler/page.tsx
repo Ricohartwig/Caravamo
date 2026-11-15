@@ -26,7 +26,7 @@ export default function HaendlerPage() {
           Angebote erscheinen in derselben Suche wie private Fahrzeuge.
         </li>
         <li className="rounded-2xl border border-line bg-card p-4">
-          Nachrichten der Interessenten laufen später über das angemeldete Konto.
+          Nachrichten der Interessenten landen im Konto und zusätzlich als E-Mail.
         </li>
       </ul>
       <Link

@@ -25,10 +25,14 @@ const paymentNotices: Record<string, string> = {
   unbekannt: "Dieses Inserat gehört nicht zu deinem Konto.",
 };
 
+const accountNotices: Record<string, string> = {
+  passwort: "Dein neues Passwort ist gespeichert.",
+};
+
 export default function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ zahlung?: string | string[] }>;
+  searchParams: Promise<{ zahlung?: string | string[]; hinweis?: string | string[] }>;
 }) {
   return (
     <Suspense fallback={<p className="text-sm text-muted">Übersicht wird geladen.</p>}>
@@ -37,15 +41,20 @@ export default function DashboardPage({
   );
 }
 
-async function Overview({ searchParams }: { searchParams: Promise<{ zahlung?: string | string[] }> }) {
+async function Overview({
+  searchParams,
+}: {
+  searchParams: Promise<{ zahlung?: string | string[]; hinweis?: string | string[] }>;
+}) {
   const user = await currentUser();
   if (!user) {
     redirect("/login?next=/dashboard");
   }
 
   const params = await searchParams;
-  const noticeKey = Array.isArray(params.zahlung) ? params.zahlung[0] : params.zahlung;
-  const notice = noticeKey ? paymentNotices[noticeKey] : undefined;
+  const paymentKey = Array.isArray(params.zahlung) ? params.zahlung[0] : params.zahlung;
+  const accountKey = Array.isArray(params.hinweis) ? params.hinweis[0] : params.hinweis;
+  const notice = (paymentKey ? paymentNotices[paymentKey] : undefined) ?? (accountKey ? accountNotices[accountKey] : undefined);
   const [counts, profile, vehicles, inquiries, views] = await Promise.all([
     accountCounts(user.id),
     accountProfile(user.id),

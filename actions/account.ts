@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser, searchLimit } from "@/lib/account";
+import { mailInquiry } from "@/lib/inquiry-mail";
 import { parseFilters, searchHref, searchTitle } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
@@ -237,9 +238,19 @@ export async function sendInquiry(
     .insert({ vehicle_id: vehicleId, sender_id: user.id, recipient_id: ownerId, body })
     .select("id")
     .single();
-  if (error || !created) {
+  if (error || !created || typeof created.id !== "string") {
     return { error: "Die Anfrage konnte nicht gesendet werden." };
   }
+
+  const [senderName, vehicleTitle] = await Promise.all([profileName(user.id), vehicleLabel(vehicleId)]);
+  await mailInquiry({
+    recipientId: ownerId,
+    senderName,
+    vehicleTitle,
+    body,
+    inquiryId: created.id,
+    kind: "anfrage",
+  });
 
   refreshAccount(vehicleId);
   redirect(`/dashboard/anfragen/${created.id}`);
@@ -264,6 +275,27 @@ export async function replyToInquiry(formData: FormData): Promise<void> {
   });
   if (error) {
     redirect(`/dashboard/anfragen/${inquiryId}?hinweis=fehler`);
+  }
+
+  const { data: inquiry } = await supabase
+    .from("inquiries")
+    .select("sender_id, recipient_id, vehicle_id")
+    .eq("id", inquiryId)
+    .maybeSingle();
+  const senderId = typeof inquiry?.sender_id === "string" ? inquiry.sender_id : "";
+  const recipientId = typeof inquiry?.recipient_id === "string" ? inquiry.recipient_id : "";
+  const vehicleId = typeof inquiry?.vehicle_id === "string" ? inquiry.vehicle_id : "";
+  const otherId = senderId === user.id ? recipientId : senderId;
+  if (otherId && vehicleId) {
+    const [senderName, vehicleTitle] = await Promise.all([profileName(user.id), vehicleLabel(vehicleId)]);
+    await mailInquiry({
+      recipientId: otherId,
+      senderName,
+      vehicleTitle,
+      body,
+      inquiryId,
+      kind: "antwort",
+    });
   }
 
   refreshAccount();
@@ -308,6 +340,20 @@ export async function clearRecentViews(formData: FormData): Promise<void> {
   const user = await requireAccount("/dashboard/gesehen");
   await createClient().then((supabase) => supabase.from("recent_views").delete().eq("user_id", user.id));
   refreshAccount();
+}
+
+async function profileName(userId: string): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("seller_profiles").select("name").eq("id", userId).maybeSingle();
+  return typeof data?.name === "string" && data.name.trim() ? data.name.trim() : "Jemand";
+}
+
+async function vehicleLabel(vehicleId: string): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("vehicles").select("brand, model").eq("id", vehicleId).maybeSingle();
+  const brand = typeof data?.brand === "string" ? data.brand.trim() : "";
+  const model = typeof data?.model === "string" ? data.model.trim() : "";
+  return [brand, model].filter(Boolean).join(" ") || "ein Inserat";
 }
 
 async function requireAccount(nextPath: string) {

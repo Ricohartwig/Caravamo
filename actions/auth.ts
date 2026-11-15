@@ -43,11 +43,19 @@ function mapAuthError(message: string): string {
     return "Die Google-Anmeldung ist im Supabase-Projekt noch nicht aktiviert.";
   }
 
+  if (normalized.includes("rate limit") || normalized.includes("too many")) {
+    return "Bitte warte einen Moment und versuche es erneut.";
+  }
+
+  if (normalized.includes("redirect")) {
+    return "Der Rücksprung nach dem Zurücksetzen ist noch nicht freigeschaltet.";
+  }
+
   if (normalized.includes("password")) {
     return "Das Passwort erfüllt die Vorgaben nicht. Mindestens 8 Zeichen.";
   }
 
-  return "Die Anmeldung ist fehlgeschlagen. Bitte versuche es erneut.";
+  return "Das hat gerade nicht geklappt. Bitte versuche es erneut.";
 }
 
 async function requestOrigin(): Promise<string> {
@@ -160,6 +168,69 @@ export async function signInWithGoogle(formData: FormData): Promise<void> {
   }
 
   redirect(data.url);
+}
+
+export async function requestPasswordReset(
+  _state: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  if (!isSupabaseConfigured()) {
+    return { error: initialMessage, message: null };
+  }
+
+  const email = readField(formData, "email");
+  if (!email.includes("@")) {
+    return { error: "Bitte eine gültige E-Mail eingeben.", message: null };
+  }
+
+  const origin = await requestOrigin();
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/passwort-neu")}`,
+  });
+
+  if (error) {
+    return { error: mapAuthError(error.message), message: null };
+  }
+
+  return {
+    error: null,
+    message: "Wenn ein Konto zu dieser E-Mail existiert, ist der Link zum neuen Passwort unterwegs.",
+  };
+}
+
+export async function updatePassword(
+  _state: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  if (!isSupabaseConfigured()) {
+    return { error: initialMessage, message: null };
+  }
+
+  const password = readField(formData, "password");
+  const confirmation = readField(formData, "confirmation");
+  if (password.length < 8) {
+    return { error: "Das Passwort braucht mindestens 8 Zeichen.", message: null };
+  }
+  if (password !== confirmation) {
+    return { error: "Die beiden Passwörter stimmen nicht überein.", message: null };
+  }
+
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    return {
+      error: "Der Link ist abgelaufen. Fordere einen neuen an.",
+      message: null,
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    return { error: mapAuthError(error.message), message: null };
+  }
+
+  redirect("/dashboard?hinweis=passwort");
 }
 
 export async function signOut(): Promise<void> {

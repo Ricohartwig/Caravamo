@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { sendInquiry } from "@/actions/account";
 
-export function InquiryForm({ vehicleId }: { vehicleId: string }) {
+export function InquiryForm({ vehicleId, mailReady }: { vehicleId: string; mailReady: boolean }) {
   const [state, action, pending] = useActionState(sendInquiry, null);
 
   return (
@@ -35,7 +35,9 @@ export function InquiryForm({ vehicleId }: { vehicleId: string }) {
         </p>
       ) : (
         <p className="mt-3 text-sm leading-6 text-muted">
-          Die Anfrage landet im Konto von dir und vom Anbieter. Es geht keine E-Mail hinaus.
+          {mailReady
+            ? "Die Anfrage landet im Konto von dir und vom Anbieter. Der Anbieter bekommt dazu eine E-Mail."
+            : "Die Anfrage landet im Konto von dir und vom Anbieter. Die E-Mail folgt, sobald der Versand eingerichtet ist."}
         </p>
       )}
     </form>
