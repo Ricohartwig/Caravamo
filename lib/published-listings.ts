@@ -1,4 +1,5 @@
 import type { VehicleFilters } from "@/lib/filters";
+import { isPublicListing } from "@/lib/listing-payment";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
 
@@ -56,6 +57,7 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
       `id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main), ${details}`,
     )
     .eq("status", "aktiv")
+    .or(`published_until.is.null,published_until.gt."${new Date().toISOString()}"`)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -105,7 +107,11 @@ export async function getPublishedListing(id: string): Promise<PublishedListing 
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !isRecord(data) || data.status !== "aktiv") {
+  if (
+    error ||
+    !isRecord(data) ||
+    !isPublicListing(readString(data.status) ?? "", readString(data.published_until))
+  ) {
     return null;
   }
 

@@ -45,6 +45,12 @@ alter table public.vehicles add column if not exists next_inspection date;
 alter table public.vehicles add column if not exists next_gas_inspection date;
 alter table public.vehicles add column if not exists speed_100 boolean;
 alter table public.vehicles add column if not exists first_registration date;
+alter table public.vehicles add column if not exists published_until timestamptz;
+alter table public.vehicles add column if not exists stripe_session_id text;
+
+create unique index if not exists vehicles_stripe_session_id_key
+  on public.vehicles (stripe_session_id)
+  where stripe_session_id is not null;
 
 -- Technische Felder, die nicht jede Fahrzeugart hat. Ein Wohnwagen lässt den
 -- Motor leer, ein Dachzeltanhänger die Abgasnorm. Die Zuladung ergibt sich
@@ -157,16 +163,35 @@ drop policy if exists "vehicle_camper_details_insert_own" on public.vehicle_camp
 drop policy if exists "vehicle_camper_details_update_own" on public.vehicle_camper_details;
 drop policy if exists "vehicle_camper_details_delete_own" on public.vehicle_camper_details;
 
--- Jeder darf Fahrzeuge und Bilder lesen.
+-- Öffentlich sind nur bezahlte, noch laufende Inserate. Entwürfe sieht der Besitzer.
 create policy "vehicles_select_public"
   on public.vehicles
   for select
-  using (true);
+  using (
+    auth.uid() = user_id
+    or (
+      status = 'aktiv'
+      and (published_until is null or published_until > now())
+    )
+  );
 
 create policy "vehicle_images_select_public"
   on public.vehicle_images
   for select
-  using (true);
+  using (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_images.vehicle_id
+        and (
+          vehicles.user_id = auth.uid()
+          or (
+            vehicles.status = 'aktiv'
+            and (vehicles.published_until is null or vehicles.published_until > now())
+          )
+        )
+    )
+  );
 
 -- Nur authentifizierte Nutzer dürfen eigene Fahrzeuge erstellen und bearbeiten.
 create policy "vehicles_insert_own"
@@ -251,7 +276,55 @@ create policy "vehicle_images_delete_own"
 create policy "vehicle_camper_details_select_public"
   on public.vehicle_camper_details
   for select
-  using (true);
+  using (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_camper_details.vehicle_id
+        and (
+          vehicles.user_id = auth.uid()
+          or (
+            vehicles.status = 'aktiv'
+            and (vehicles.published_until is null or vehicles.published_until > now())
+          )
+        )
+    )
+  );
+
+-- Normale Anmeldungen können den Status, die Laufzeit und die Stripe-Sitzung
+-- nicht selbst auf bezahlt setzen. Das darf der Webhook mit dem Service-Role-Schlüssel.
+create or replace function public.guard_vehicle_publication()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('postgres', 'supabase_admin') or auth.role() = 'service_role' then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.status := 'entwurf';
+    new.published_until := null;
+    new.stripe_session_id := null;
+    return new;
+  end if;
+
+  if new.status is distinct from old.status
+     or new.published_until is distinct from old.published_until
+     or new.stripe_session_id is distinct from old.stripe_session_id then
+    raise exception 'Inserate werden erst nach der bestätigten Zahlung veröffentlicht';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_vehicle_publication on public.vehicles;
+
+create trigger guard_vehicle_publication
+  before insert or update on public.vehicles
+  for each row execute function public.guard_vehicle_publication();
 
 create policy "vehicle_camper_details_insert_own"
   on public.vehicle_camper_details
