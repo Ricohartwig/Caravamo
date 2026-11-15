@@ -4,11 +4,11 @@ import { SearchFilters } from "@/components/SearchFilters";
 import { VehicleCard } from "@/components/VehicleCard";
 import { filterVehicles, parseFilters } from "@/lib/filters";
 import { formatOfferCount } from "@/lib/format";
+import { listOfferCards } from "@/lib/published-listings";
 
 export const metadata: Metadata = {
   title: "Fahrzeuge suchen",
-  description:
-    "Durchsuchen Sie Platzhalter-Angebote nach Marke, Modell und Fahrzeugtyp.",
+  description: "Durchsuchen Sie Angebote nach Marke, Modell und Fahrzeugtyp.",
 };
 
 export default function SuchePage({ searchParams }: PageProps<"/suche">) {
@@ -16,8 +16,8 @@ export default function SuchePage({ searchParams }: PageProps<"/suche">) {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Fahrzeuge suchen</h1>
       <p className="mt-2 max-w-2xl text-muted">
-        Sechs Beispielangebote. Filter kommen aus der Adresse und gelten sofort
-        auf dieser Seite.
+        Veröffentlichte Inserate stehen neben den Beispielangeboten. Filter kommen
+        aus der Adresse und gelten sofort auf dieser Seite.
       </p>
       <Suspense fallback={<SearchFallback />}>
         <SearchResults searchParams={searchParams} />
@@ -32,7 +32,16 @@ async function SearchResults({
   searchParams: PageProps<"/suche">["searchParams"];
 }) {
   const filters = parseFilters(await searchParams);
-  const results = filterVehicles(filters);
+  const published = await listOfferCards();
+  const results = [
+    ...published.filter(
+      (vehicle) =>
+        sameTextValue(vehicle.brand, filters.brand) &&
+        sameTextValue(vehicle.model, filters.model) &&
+        sameTextValue(vehicle.type, filters.type),
+    ),
+    ...filterVehicles(filters),
+  ];
   const active = [
     filters.brand ? `Marke ${filters.brand}` : "",
     filters.model ? `Modell ${filters.model}` : "",
@@ -75,6 +84,14 @@ async function SearchResults({
       </section>
     </div>
   );
+}
+
+function sameTextValue(value: string, query: string): boolean {
+  if (query === "") {
+    return true;
+  }
+
+  return value.toLocaleLowerCase("de-DE") === query.toLocaleLowerCase("de-DE");
 }
 
 function SearchFallback() {
