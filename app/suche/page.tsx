@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { saveSearch } from "@/actions/account";
 import { SearchFilters } from "@/components/SearchFilters";
 import { VehicleCard } from "@/components/VehicleCard";
-import { parseFilters, type VehicleFilters } from "@/lib/filters";
+import { loadCardMarks, marksFor } from "@/lib/account";
+import { parseFilters, searchHref, searchTitle, type VehicleFilters } from "@/lib/filters";
 import { formatOfferCount, formatPrice } from "@/lib/format";
 import { searchOffers } from "@/lib/published-listings";
 
@@ -32,17 +34,20 @@ async function SearchResults({
   searchParams: PageProps<"/suche">["searchParams"];
 }) {
   const filters = parseFilters(await searchParams);
-  const results = await searchOffers(filters);
+  const [results, marks] = await Promise.all([searchOffers(filters), loadCardMarks(searchHref(filters))]);
   const active = activeFilters(filters);
 
   return (
     <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
       <SearchFilters filters={filters} />
       <section className="min-w-0 flex-1" aria-label="Suchergebnisse">
-        <p className="text-sm font-medium text-muted">
-          {formatOfferCount(results.length)}
-          {active.length > 0 ? ` · ${active.join(" · ")}` : ""}
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <p className="text-sm font-medium text-muted">
+            {formatOfferCount(results.length)}
+            {active.length > 0 ? ` · ${active.join(" · ")}` : ""}
+          </p>
+          <SaveSearchForm filters={filters} />
+        </div>
         {results.length === 0 ? (
           <div className="mt-4 rounded-2xl border border-dashed border-line bg-card px-6 py-12 text-center">
             <h2 className="text-lg font-semibold">Keine Fahrzeuge für diese Auswahl</h2>
@@ -60,7 +65,7 @@ async function SearchResults({
           <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {results.map((vehicle) => (
               <li key={vehicle.id}>
-                <VehicleCard vehicle={vehicle} />
+                <VehicleCard vehicle={vehicle} marks={marksFor(vehicle.id, marks)} />
               </li>
             ))}
           </ul>
@@ -79,6 +84,35 @@ function activeFilters(filters: VehicleFilters): string[] {
     filters.priceMin !== null ? `ab ${formatPrice(filters.priceMin)}` : "",
     filters.priceMax !== null ? `bis ${formatPrice(filters.priceMax)}` : "",
   ].filter((entry) => entry.length > 0);
+}
+
+function SaveSearchForm({ filters }: { filters: VehicleFilters }) {
+  return (
+    <form action={saveSearch} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <input type="hidden" name="brand" value={filters.brand} />
+      <input type="hidden" name="model" value={filters.model} />
+      <input type="hidden" name="type" value={filters.type} />
+      <input type="hidden" name="body" value={filters.body} />
+      <input type="hidden" name="price_min" value={filters.priceMin ?? ""} />
+      <input type="hidden" name="price_max" value={filters.priceMax ?? ""} />
+      <label className="sr-only" htmlFor="suche-name">
+        Name der Suche
+      </label>
+      <input
+        id="suche-name"
+        name="name"
+        defaultValue={searchTitle(filters)}
+        maxLength={80}
+        className="h-11 rounded-xl border border-line bg-card px-3 text-sm"
+      />
+      <button
+        type="submit"
+        className="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-card px-4 text-sm font-semibold hover:bg-sand"
+      >
+        Suche speichern
+      </button>
+    </form>
+  );
 }
 
 function SearchFallback() {

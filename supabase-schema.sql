@@ -387,6 +387,394 @@ from public.users;
 
 grant select on public.seller_profiles to anon, authenticated;
 
+alter table public.users add column if not exists city text;
+
+create or replace view public.seller_profiles as
+select id, name, role, city
+from public.users;
+
+-- Der Ort darf im Exposé stehen. Die Rolle bestimmt den Inseratspreis und
+-- bleibt an der Anmeldung hängen.
+create or replace function public.guard_user_role()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('postgres', 'supabase_admin') or auth.role() = 'service_role' then
+    return new;
+  end if;
+
+  if new.role is distinct from old.role then
+    raise exception 'Die Rolle kann hier nicht geändert werden';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_user_role on public.users;
+
+create trigger guard_user_role
+  before update on public.users
+  for each row execute function public.guard_user_role();
+
+create table if not exists public.favorites (
+  user_id uuid not null references public.users (id) on delete cascade,
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  note text,
+  price_at_save numeric,
+  created_at timestamptz not null default now(),
+  primary key (user_id, vehicle_id),
+  constraint favorites_note_length check (note is null or char_length(note) <= 280)
+);
+
+create table if not exists public.saved_searches (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users (id) on delete cascade,
+  name text not null,
+  filters jsonb not null,
+  last_count integer not null default 0,
+  created_at timestamptz not null default now(),
+  constraint saved_searches_name_length check (char_length(name) between 1 and 80)
+);
+
+create table if not exists public.inquiries (
+  id uuid primary key default gen_random_uuid(),
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  sender_id uuid not null references public.users (id) on delete cascade,
+  recipient_id uuid not null references public.users (id) on delete cascade,
+  body text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint inquiries_body_length check (char_length(body) between 1 and 2000),
+  constraint inquiries_not_self check (sender_id <> recipient_id)
+);
+
+create unique index if not exists inquiries_vehicle_sender_key
+  on public.inquiries (vehicle_id, sender_id);
+
+create table if not exists public.inquiry_replies (
+  id uuid primary key default gen_random_uuid(),
+  inquiry_id uuid not null references public.inquiries (id) on delete cascade,
+  sender_id uuid not null references public.users (id) on delete cascade,
+  body text not null,
+  created_at timestamptz not null default now(),
+  constraint inquiry_replies_body_length check (char_length(body) between 1 and 2000)
+);
+
+create table if not exists public.recent_views (
+  user_id uuid not null references public.users (id) on delete cascade,
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  viewed_at timestamptz not null default now(),
+  primary key (user_id, vehicle_id)
+);
+
+create table if not exists public.comparisons (
+  user_id uuid not null references public.users (id) on delete cascade,
+  vehicle_id uuid not null references public.vehicles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, vehicle_id)
+);
+
+create index if not exists favorites_user_created_idx
+  on public.favorites (user_id, created_at desc);
+
+create index if not exists saved_searches_user_created_idx
+  on public.saved_searches (user_id, created_at desc);
+
+create index if not exists inquiries_recipient_created_idx
+  on public.inquiries (recipient_id, created_at desc);
+
+create index if not exists inquiries_sender_created_idx
+  on public.inquiries (sender_id, created_at desc);
+
+create index if not exists recent_views_user_viewed_idx
+  on public.recent_views (user_id, viewed_at desc);
+
+alter table public.favorites enable row level security;
+alter table public.saved_searches enable row level security;
+alter table public.inquiries enable row level security;
+alter table public.inquiry_replies enable row level security;
+alter table public.recent_views enable row level security;
+alter table public.comparisons enable row level security;
+
+drop policy if exists "favorites_select" on public.favorites;
+create policy "favorites_select"
+  on public.favorites
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "favorites_delete" on public.favorites;
+create policy "favorites_delete"
+  on public.favorites
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "favorites_insert" on public.favorites;
+create policy "favorites_insert"
+  on public.favorites
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = favorites.vehicle_id
+        and vehicles.status = 'aktiv'
+        and (vehicles.published_until is null or vehicles.published_until > now())
+    )
+  );
+
+drop policy if exists "favorites_update" on public.favorites;
+create policy "favorites_update"
+  on public.favorites
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "saved_searches_own" on public.saved_searches;
+create policy "saved_searches_own"
+  on public.saved_searches
+  for all
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "inquiries_select_party" on public.inquiries;
+create policy "inquiries_select_party"
+  on public.inquiries
+  for select
+  to authenticated
+  using (sender_id = auth.uid() or recipient_id = auth.uid());
+
+drop policy if exists "inquiries_insert_buyer" on public.inquiries;
+create policy "inquiries_insert_buyer"
+  on public.inquiries
+  for insert
+  to authenticated
+  with check (
+    sender_id = auth.uid()
+    and sender_id <> recipient_id
+    and exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = inquiries.vehicle_id
+        and vehicles.user_id = inquiries.recipient_id
+        and vehicles.status = 'aktiv'
+        and (vehicles.published_until is null or vehicles.published_until > now())
+    )
+  );
+
+drop policy if exists "inquiries_mark_read" on public.inquiries;
+create policy "inquiries_mark_read"
+  on public.inquiries
+  for update
+  to authenticated
+  using (recipient_id = auth.uid())
+  with check (recipient_id = auth.uid());
+
+drop policy if exists "inquiry_replies_select_party" on public.inquiry_replies;
+create policy "inquiry_replies_select_party"
+  on public.inquiry_replies
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.inquiries
+      where inquiries.id = inquiry_replies.inquiry_id
+        and (inquiries.sender_id = auth.uid() or inquiries.recipient_id = auth.uid())
+    )
+  );
+
+drop policy if exists "inquiry_replies_insert_party" on public.inquiry_replies;
+create policy "inquiry_replies_insert_party"
+  on public.inquiry_replies
+  for insert
+  to authenticated
+  with check (
+    sender_id = auth.uid()
+    and exists (
+      select 1
+      from public.inquiries
+      where inquiries.id = inquiry_replies.inquiry_id
+        and (inquiries.sender_id = auth.uid() or inquiries.recipient_id = auth.uid())
+    )
+  );
+
+drop policy if exists "recent_views_select" on public.recent_views;
+create policy "recent_views_select"
+  on public.recent_views
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "recent_views_delete" on public.recent_views;
+create policy "recent_views_delete"
+  on public.recent_views
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "recent_views_insert" on public.recent_views;
+create policy "recent_views_insert"
+  on public.recent_views
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = recent_views.vehicle_id
+        and vehicles.status = 'aktiv'
+        and (vehicles.published_until is null or vehicles.published_until > now())
+    )
+  );
+
+drop policy if exists "recent_views_update" on public.recent_views;
+create policy "recent_views_update"
+  on public.recent_views
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "comparisons_select" on public.comparisons;
+create policy "comparisons_select"
+  on public.comparisons
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "comparisons_delete" on public.comparisons;
+create policy "comparisons_delete"
+  on public.comparisons
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "comparisons_insert" on public.comparisons;
+create policy "comparisons_insert"
+  on public.comparisons
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = comparisons.vehicle_id
+        and vehicles.status = 'aktiv'
+        and (vehicles.published_until is null or vehicles.published_until > now())
+    )
+  );
+
+create or replace function public.guard_favorite_update()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.user_id is distinct from old.user_id
+     or new.vehicle_id is distinct from old.vehicle_id
+     or new.price_at_save is distinct from old.price_at_save
+     or new.created_at is distinct from old.created_at then
+    raise exception 'Nur die Notiz eines Merklisteneintrags kann geändert werden';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_favorite_update on public.favorites;
+create trigger guard_favorite_update
+  before update on public.favorites
+  for each row execute function public.guard_favorite_update();
+
+create or replace function public.guard_recent_view_update()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.user_id is distinct from old.user_id
+     or new.vehicle_id is distinct from old.vehicle_id then
+    raise exception 'Ein angesehener Eintrag bleibt am selben Fahrzeug';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_recent_view_update on public.recent_views;
+create trigger guard_recent_view_update
+  before update on public.recent_views
+  for each row execute function public.guard_recent_view_update();
+
+create or replace function public.guard_inquiry_update()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.vehicle_id is distinct from old.vehicle_id
+     or new.sender_id is distinct from old.sender_id
+     or new.recipient_id is distinct from old.recipient_id
+     or new.body is distinct from old.body
+     or new.created_at is distinct from old.created_at then
+    raise exception 'Eine Anfrage kann nur als gelesen markiert werden';
+  end if;
+
+  if auth.uid() is distinct from old.recipient_id then
+    raise exception 'Nur der Empfänger markiert eine Anfrage als gelesen';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_inquiry_update on public.inquiries;
+create trigger guard_inquiry_update
+  before update on public.inquiries
+  for each row execute function public.guard_inquiry_update();
+
+create or replace function public.guard_comparison_limit()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if (
+    select count(*)
+    from public.comparisons
+    where user_id = new.user_id
+  ) >= 3 then
+    raise exception 'Höchstens drei Fahrzeuge im Vergleich';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_comparison_limit on public.comparisons;
+create trigger guard_comparison_limit
+  before insert on public.comparisons
+  for each row execute function public.guard_comparison_limit();
+
+grant select, insert, update, delete on public.favorites to authenticated;
+grant select, insert, update, delete on public.saved_searches to authenticated;
+grant select, insert, update on public.inquiries to authenticated;
+grant select, insert on public.inquiry_replies to authenticated;
+grant select, insert, update, delete on public.recent_views to authenticated;
+grant select, insert, update, delete on public.comparisons to authenticated;
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'vehicle-images',

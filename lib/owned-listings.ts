@@ -30,6 +30,17 @@ export function isVehicleId(value: string): boolean {
   return vehicleIdPattern.test(value);
 }
 
+export function listingsExpiringWithin(vehicles: OwnedVehicle[], days = 7): OwnedVehicle[] {
+  const soon = Date.now() + days * 24 * 60 * 60 * 1000;
+  return vehicles.filter((vehicle) => {
+    if (!vehicle.publishedUntil || !isPublicListing(vehicle.status, vehicle.publishedUntil)) {
+      return false;
+    }
+
+    return new Date(vehicle.publishedUntil).getTime() <= soon;
+  });
+}
+
 export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]> {
   if (!isSupabaseConfigured()) {
     return [];

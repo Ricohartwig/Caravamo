@@ -147,7 +147,7 @@ function AccountLinks({
             : "text-sm font-semibold text-foreground hover:text-pine"
         }
       >
-        Meine Inserate
+        Mein Konto
       </Link>
       <form action={signOut}>
         <button

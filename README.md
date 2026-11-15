@@ -2,7 +2,7 @@
 
 Caravamo by CarWo Marketplace
 
-Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Startseite und Suche zeigen bezahlte Inserate aus Supabase. Angemeldete Nutzer stellen Fahrzeuge über `/inserieren` ein, bezahlen bei Stripe und verwalten sie unter `/dashboard`.
+Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Startseite und Suche zeigen bezahlte Inserate aus Supabase. Angemeldete Nutzer stellen Fahrzeuge über `/inserieren` ein, bezahlen bei Stripe und finden unter `/dashboard` Merkliste, gespeicherte Suchen, Anfragen, Verlauf, Vergleich, eigene Inserate und das Profil.
 
 Ein neues Inserat bleibt `entwurf`, bis der Webhook `/api/webhooks/stripe` eine bezahlte Checkout-Sitzung bestätigt. Danach steht der Status auf `aktiv` und `published_until` liegt 30 Tage in der Zukunft. Privat kostet 4,99 €, Händler 6,99 €. Die Schlüssel `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRIVAT`, `STRIPE_PRICE_HAENDLER` und `SUPABASE_SERVICE_ROLE_KEY` bleiben außerhalb von Git.
 
