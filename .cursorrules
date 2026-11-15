@@ -1,0 +1,1 @@
+Verwende immer den Next.js App Router. Bevorzuge Server Components. Verwende 'use client' nur, wenn Hooks (useState, useEffect) oder Interaktivität zwingend erforderlich sind. Erstelle UI-Komponenten in /components/ui und bündle Geschäftslogik in /lib oder /actions. Nutze Tailwind CSS für das Styling und lucide-react für Icons.
