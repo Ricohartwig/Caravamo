@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublishedExpose } from "@/components/PublishedExpose";
+import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
 import { getPublishedListing } from "@/lib/published-listings";
 
 export const metadata: Metadata = {
@@ -35,7 +36,25 @@ async function VehicleExpose({
     notFound();
   }
 
-  return <PublishedExpose listing={listing} />;
+  const viewer = await currentUser();
+  if (viewer && viewer.id !== listing.sellerId) {
+    await rememberView(viewer.id, listing.id);
+  }
+
+  const saved = viewer ? await loadCardMarks(`/fahrzeug/${listing.id}`) : null;
+
+  return (
+    <PublishedExpose
+      listing={listing}
+      viewerId={viewer?.id ?? null}
+      marks={{
+        signedIn: Boolean(viewer),
+        saved: saved?.favorites.has(listing.id) ?? false,
+        compared: saved?.comparisons.has(listing.id) ?? false,
+        returnTo: `/fahrzeug/${listing.id}`,
+      }}
+    />
+  );
 }
 
 function VehicleFallback() {

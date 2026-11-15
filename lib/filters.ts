@@ -31,6 +31,64 @@ function priceParam(value: SearchParamValue): number | null {
   return price;
 }
 
+export function searchHref(filters: VehicleFilters): string {
+  const params = new URLSearchParams();
+  if (filters.brand) {
+    params.set("brand", filters.brand);
+  }
+  if (filters.model) {
+    params.set("model", filters.model);
+  }
+  if (filters.type) {
+    params.set("type", filters.type);
+  }
+  if (filters.body) {
+    params.set("body", filters.body);
+  }
+  if (filters.priceMin !== null) {
+    params.set("price_min", String(filters.priceMin));
+  }
+  if (filters.priceMax !== null) {
+    params.set("price_max", String(filters.priceMax));
+  }
+
+  const query = params.toString();
+  return query ? `/suche?${query}` : "/suche";
+}
+
+export function searchTitle(filters: VehicleFilters): string {
+  const parts = [
+    filters.brand,
+    filters.model,
+    filters.type,
+    filters.body,
+    filters.priceMin !== null ? `ab ${filters.priceMin} €` : "",
+    filters.priceMax !== null ? `bis ${filters.priceMax} €` : "",
+  ].filter((part) => part.length > 0);
+
+  const title = parts.length > 0 ? parts.join(" · ") : "Alle Angebote";
+  return title.slice(0, 80);
+}
+
+export function parseStoredFilters(value: unknown): VehicleFilters {
+  if (!isFilterRecord(value)) {
+    return { brand: "", model: "", type: "", body: "", priceMin: null, priceMax: null };
+  }
+
+  return parseFilters({
+    brand: typeof value.brand === "string" ? value.brand : "",
+    model: typeof value.model === "string" ? value.model : "",
+    type: typeof value.type === "string" ? value.type : "",
+    body: typeof value.body === "string" ? value.body : "",
+    price_min: typeof value.priceMin === "number" ? String(value.priceMin) : "",
+    price_max: typeof value.priceMax === "number" ? String(value.priceMax) : "",
+  });
+}
+
+function isFilterRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function parseFilters(params: {
   brand?: SearchParamValue;
   model?: SearchParamValue;

@@ -24,8 +24,10 @@ export type PublishedListing = {
   priceTax: string | null;
   description: string | null;
   imageUrls: string[];
+  sellerId: string;
   sellerName: string;
   sellerKind: "Privat" | "Händler";
+  sellerCity: string | null;
   values: Record<string, unknown>;
 };
 
@@ -134,27 +136,32 @@ export async function getPublishedListing(id: string): Promise<PublishedListing 
     priceTax: readString(data.price_tax),
     description: readString(data.description),
     imageUrls: imageUrls(data.vehicle_images),
+    sellerId: readString(data.user_id) ?? "",
     sellerName: seller.name,
     sellerKind: seller.kind,
+    sellerCity: seller.city,
     values: { ...data, ...(details ?? {}) },
   };
 }
 
-async function readSeller(userId: string | null): Promise<{ name: string; kind: "Privat" | "Händler" }> {
+async function readSeller(
+  userId: string | null,
+): Promise<{ name: string; kind: "Privat" | "Händler"; city: string | null }> {
   if (!userId) {
-    return { name: "Privater Anbieter", kind: "Privat" };
+    return { name: "Privater Anbieter", kind: "Privat", city: null };
   }
 
   const supabase = await createClient();
-  const { data } = await supabase.from("seller_profiles").select("name, role").eq("id", userId).maybeSingle();
+  const { data } = await supabase.from("seller_profiles").select("name, role, city").eq("id", userId).maybeSingle();
   if (!isRecord(data)) {
-    return { name: "Privater Anbieter", kind: "Privat" };
+    return { name: "Privater Anbieter", kind: "Privat", city: null };
   }
 
   const role = readString(data.role)?.toLowerCase();
   return {
     name: readString(data.name) ?? "Privater Anbieter",
     kind: role === "haendler" || role === "händler" ? "Händler" : "Privat",
+    city: readString(data.city),
   };
 }
 

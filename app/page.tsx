@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Caravan, Store, Search } from "lucide-react";
 import { SearchBox } from "@/components/SearchBox";
 import { VehicleCard } from "@/components/VehicleCard";
+import { loadCardMarks, marksFor } from "@/lib/account";
 import { listingCategories } from "@/lib/listing-options";
 import { listNewestOffers } from "@/lib/published-listings";
 
@@ -92,7 +93,7 @@ export default function HomePage() {
 }
 
 async function NewestListings() {
-  const offers = await listNewestOffers(6);
+  const [offers, marks] = await Promise.all([listNewestOffers(6), loadCardMarks("/")]);
 
   if (offers.length === 0) {
     return (
@@ -113,7 +114,7 @@ async function NewestListings() {
     <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {offers.map((vehicle) => (
         <li key={vehicle.id}>
-          <VehicleCard vehicle={vehicle} />
+          <VehicleCard vehicle={vehicle} marks={marksFor(vehicle.id, marks)} />
         </li>
       ))}
     </ul>

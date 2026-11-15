@@ -3,10 +3,19 @@ import { ListingFacts } from "@/components/ListingFacts";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { SellerContact } from "@/components/SellerContact";
 import { VehiclePlaceholder } from "@/components/VehiclePlaceholder";
+import type { CardMarks } from "@/lib/account";
 import { formatPrice } from "@/lib/format";
 import type { PublishedListing } from "@/lib/published-listings";
 
-export function PublishedExpose({ listing }: { listing: PublishedListing }) {
+export function PublishedExpose({
+  listing,
+  viewerId,
+  marks,
+}: {
+  listing: PublishedListing;
+  viewerId: string | null;
+  marks: CardMarks;
+}) {
   const price = listing.priceTax
     ? `${formatPrice(listing.price)} ${listing.priceTax}`
     : formatPrice(listing.price);
@@ -41,8 +50,13 @@ export function PublishedExpose({ listing }: { listing: PublishedListing }) {
           <ListingFacts values={listing.values} />
         </div>
         <SellerContact
-          seller={{ name: listing.sellerName, kind: listing.sellerKind }}
-          vehicleTitle={listing.title}
+          sellerName={listing.sellerName}
+          sellerKind={listing.sellerKind}
+          sellerCity={listing.sellerCity}
+          sellerId={listing.sellerId}
+          vehicleId={listing.id}
+          viewerId={viewerId}
+          marks={marks}
         />
       </div>
     </article>
