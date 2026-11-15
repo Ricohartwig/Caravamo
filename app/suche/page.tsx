@@ -5,8 +5,8 @@ import { saveSearch } from "@/actions/account";
 import { SearchFilters } from "@/components/SearchFilters";
 import { VehicleCard } from "@/components/VehicleCard";
 import { loadCardMarks, marksFor } from "@/lib/account";
-import { parseFilters, searchHref, searchTitle, type VehicleFilters } from "@/lib/filters";
-import { formatOfferCount, formatPrice } from "@/lib/format";
+import { filterLabels, parseFilters, searchHref, searchTitle, type VehicleFilters } from "@/lib/filters";
+import { formatOfferCount } from "@/lib/format";
 import { searchOffers } from "@/lib/published-listings";
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export default function SuchePage({ searchParams }: PageProps<"/suche">) {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Fahrzeuge suchen</h1>
       <p className="mt-2 max-w-2xl text-muted">
-        Die Treffer kommen aus den veröffentlichten Inseraten. Marke, Modell, Typ und Preis stehen in der Adresse.
+        Die Treffer kommen aus den veröffentlichten Inseraten. Bei Wohnmobilen klappen Aufbau, Gewicht und Technik in der Seitenleiste auf.
       </p>
       <Suspense fallback={<SearchFallback />}>
         <SearchResults searchParams={searchParams} />
@@ -35,11 +35,11 @@ async function SearchResults({
 }) {
   const filters = parseFilters(await searchParams);
   const [results, marks] = await Promise.all([searchOffers(filters), loadCardMarks(searchHref(filters))]);
-  const active = activeFilters(filters);
+  const active = filterLabels(filters);
 
   return (
     <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-      <SearchFilters filters={filters} />
+      <SearchFilters key={searchHref(filters)} filters={filters} />
       <section className="min-w-0 flex-1" aria-label="Suchergebnisse">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <p className="text-sm font-medium text-muted">
@@ -75,26 +75,14 @@ async function SearchResults({
   );
 }
 
-function activeFilters(filters: VehicleFilters): string[] {
-  return [
-    filters.brand ? `Marke ${filters.brand}` : "",
-    filters.model ? `Modell ${filters.model}` : "",
-    filters.type ? `Typ ${filters.type}` : "",
-    filters.body ? `Aufbau ${filters.body}` : "",
-    filters.priceMin !== null ? `ab ${formatPrice(filters.priceMin)}` : "",
-    filters.priceMax !== null ? `bis ${formatPrice(filters.priceMax)}` : "",
-  ].filter((entry) => entry.length > 0);
-}
-
 function SaveSearchForm({ filters }: { filters: VehicleFilters }) {
+  const params = new URLSearchParams(searchHref(filters).split("?")[1] ?? "");
+
   return (
     <form action={saveSearch} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <input type="hidden" name="brand" value={filters.brand} />
-      <input type="hidden" name="model" value={filters.model} />
-      <input type="hidden" name="type" value={filters.type} />
-      <input type="hidden" name="body" value={filters.body} />
-      <input type="hidden" name="price_min" value={filters.priceMin ?? ""} />
-      <input type="hidden" name="price_max" value={filters.priceMax ?? ""} />
+      {[...params.entries()].map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <label className="sr-only" htmlFor="suche-name">
         Name der Suche
       </label>

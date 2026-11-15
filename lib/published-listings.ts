@@ -1,4 +1,5 @@
-import type { VehicleFilters } from "@/lib/filters";
+import { connection } from "next/server";
+import { blankFilters, camperFilterActive, type VehicleFilters } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
@@ -31,17 +32,8 @@ export type PublishedListing = {
   values: Record<string, unknown>;
 };
 
-const emptyFilters: VehicleFilters = {
-  brand: "",
-  model: "",
-  type: "",
-  body: "",
-  priceMin: null,
-  priceMax: null,
-};
-
 export async function listNewestOffers(limit = 6): Promise<OfferCard[]> {
-  return searchOffers(emptyFilters, limit);
+  return searchOffers(blankFilters(), limit);
 }
 
 export async function searchOffers(filters: VehicleFilters, limit = 48): Promise<OfferCard[]> {
@@ -49,8 +41,10 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
     return [];
   }
 
+  await connection();
+  const now = new Date().toISOString();
   const supabase = await createClient();
-  const details = filters.body
+  const details = camperFilterActive(filters)
     ? "vehicle_camper_details!inner(body_type)"
     : "vehicle_camper_details(body_type)";
   let query = supabase
@@ -59,7 +53,7 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
       `id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main), ${details}`,
     )
     .eq("status", "aktiv")
-    .or(`published_until.is.null,published_until.gt."${new Date().toISOString()}"`)
+    .or(`published_until.is.null,published_until.gt."${now}"`)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -72,15 +66,13 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
   if (filters.type) {
     query = query.eq("type", filters.type);
   }
-  if (filters.body) {
-    query = query.eq("vehicle_camper_details.body_type", filters.body);
-  }
   if (filters.priceMin !== null) {
     query = query.gte("price", filters.priceMin);
   }
   if (filters.priceMax !== null) {
     query = query.lte("price", filters.priceMax);
   }
+  query = applyCamperFilters(query, filters);
 
   const { data, error } = await query;
   if (error || !Array.isArray(data)) {
@@ -92,6 +84,51 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
     return card ? [card] : [];
   });
 }
+
+function applyCamperFilters<T extends CamperQuery<T>>(query: T, filters: VehicleFilters): T {
+  if (filters.body) {
+    query = query.eq("vehicle_camper_details.body_type", filters.body);
+  }
+  if (filters.weightMax !== null) {
+    query = query.lte("vehicle_camper_details.gross_weight_kg", filters.weightMax);
+  }
+  if (filters.solar) {
+    query = query.eq("vehicle_camper_details.has_solar", true);
+  }
+  if (filters.inverter) {
+    query = query.eq("vehicle_camper_details.has_inverter", true);
+  }
+  if (filters.awning) {
+    query = query.eq("vehicle_camper_details.has_awning", true);
+  }
+  if (filters.air) {
+    query = query.eq("vehicle_camper_details.has_air_suspension", true);
+  }
+  if (filters.fuel) {
+    query = query.eq("vehicle_camper_details.fuel", filters.fuel);
+  }
+  if (filters.transmission) {
+    query = query.eq("vehicle_camper_details.transmission", filters.transmission);
+  }
+  if (filters.bed) {
+    query = query.contains("vehicle_camper_details.bed_types", [filters.bed]);
+  }
+  if (filters.climate) {
+    query = query.contains("vehicle_camper_details.climate", [filters.climate]);
+  }
+  if (filters.sleepMin !== null) {
+    query = query.gte("vehicle_camper_details.sleeping_places", filters.sleepMin);
+  }
+
+  return query;
+}
+
+type CamperQuery<T> = {
+  eq: (column: string, value: string | boolean) => T;
+  lte: (column: string, value: number) => T;
+  gte: (column: string, value: number) => T;
+  contains: (column: string, value: readonly string[]) => T;
+};
 
 function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, (char) => `\\${char}`);

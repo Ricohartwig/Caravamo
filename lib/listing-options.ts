@@ -42,6 +42,11 @@ export const bodyTypes: Record<ListingCategory, readonly string[]> = {
 
 export const allBodyTypes = Object.values(bodyTypes).flat();
 
+export function categoryOfBody(body: string): ListingCategory | null {
+  const entries = Object.entries(bodyTypes) as [ListingCategory, readonly string[]][];
+  return entries.find(([, types]) => types.includes(body))?.[0] ?? null;
+}
+
 export function canonicalBodyType(value: string): string | null {
   const needle = value.trim().toLocaleLowerCase("de-DE");
   if (!needle) {
