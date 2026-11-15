@@ -1,5 +1,3 @@
-import type { VehicleType } from "@/lib/vehicles";
-
 const tones = {
   0: "from-[#16352e] via-[#1f6a58] to-[#d7a15a]",
   1: "from-[#1c2a33] via-[#3e6d86] to-[#e6d3b4]",
@@ -9,7 +7,7 @@ const tones = {
 
 type VehiclePlaceholderProps = {
   title: string;
-  type: VehicleType;
+  type: string;
   tone: keyof typeof tones;
   label: string;
   decorative?: boolean;
@@ -50,7 +48,7 @@ export function VehiclePlaceholder({
   );
 }
 
-function Silhouette({ type }: { type: VehicleType }) {
+function Silhouette({ type }: { type: string }) {
   if (type === "PKW") {
     return (
       <g>

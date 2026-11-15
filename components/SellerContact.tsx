@@ -17,10 +17,12 @@ export function SellerContact({ seller, vehicleTitle }: SellerContactProps) {
       <p className="text-sm font-medium text-muted">Verkäufer</p>
       <h2 className="mt-1 text-lg font-semibold">{seller.name}</h2>
       <p className="mt-1 text-sm text-muted">{seller.kind}</p>
-      <p className="mt-3 flex items-center gap-2 text-sm">
-        <MapPin aria-hidden="true" className="size-4 text-pine" />
-        {seller.location}
-      </p>
+      {seller.location ? (
+        <p className="mt-3 flex items-center gap-2 text-sm">
+          <MapPin aria-hidden="true" className="size-4 text-pine" />
+          {seller.location}
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={() => setNoted(true)}

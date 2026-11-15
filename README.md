@@ -2,7 +2,7 @@
 
 Caravamo by CarWo Marketplace
 
-Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Die Angebote auf der Suche sind typisierte Platzhalter. Supabase ist vorbereitet, aber nicht mit einem echten Projekt verbunden.
+Grundgerüst eines Fahrzeug-Marktplatzes für Privat (B2C) und Händler (B2B). Die Suche zeigt Beispielangebote und veröffentlichte Inserate. Angemeldete Nutzer stellen Fahrzeuge über `/inserieren` ein.
 
 ## Start
 

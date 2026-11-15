@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { Calendar, Gauge, Zap } from "lucide-react";
 import { SellerContact } from "@/components/SellerContact";
 import { VehicleGallery } from "@/components/VehicleGallery";
+import { PublishedExpose } from "@/components/PublishedExpose";
 import { formatMileage, formatPower, formatPrice } from "@/lib/format";
+import { getPublishedListing } from "@/lib/published-listings";
 import { getVehicle } from "@/lib/vehicles";
 
 export const metadata: Metadata = {
@@ -30,7 +32,12 @@ async function VehicleExpose({
   const vehicle = getVehicle(id);
 
   if (!vehicle) {
-    notFound();
+    const listing = await getPublishedListing(id);
+    if (!listing) {
+      notFound();
+    }
+
+    return <PublishedExpose listing={listing} />;
   }
 
   const facts = [

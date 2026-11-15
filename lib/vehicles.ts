@@ -14,6 +14,8 @@ export const vehicleTypes = [
   "Wohnmobil",
   "Wohnwagen",
   "Transporter",
+  "Dachzelt/Faltanhänger",
+  "Kabine",
 ] as const;
 
 export type VehicleType = (typeof vehicleTypes)[number];
@@ -35,7 +37,7 @@ export type GalleryShot = {
 export type Seller = {
   name: string;
   kind: "Privat" | "Händler";
-  location: string;
+  location?: string | null;
 };
 
 export type Vehicle = {
