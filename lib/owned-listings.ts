@@ -1,4 +1,5 @@
 import { listingFormValues } from "@/lib/listing-form-values";
+import { isPublicListing } from "@/lib/listing-payment";
 import type { ListingFormInput } from "@/lib/listing-schema";
 import { storagePathFromPublicUrl } from "@/lib/vehicle-images";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -10,11 +11,14 @@ export type OwnedVehicle = {
   price: number;
   type: string;
   status: string;
+  publishedUntil: string | null;
   imageUrl: string | null;
 };
 
 export type OwnedDraft = {
   id: string;
+  status: string;
+  publishedUntil: string | null;
   values: ListingFormInput;
   images: { path: string; previewUrl: string }[];
 };
@@ -34,7 +38,7 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("id, brand, model, type, price, status, vehicle_images(url, is_main)")
+    .select("id, brand, model, type, price, status, published_until, vehicle_images(url, is_main)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -62,7 +66,8 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
         title: model ? `${brand} ${model}` : brand,
         price,
         type: readString(row.type) ?? "Fahrzeug",
-        status: readString(row.status) ?? "aktiv",
+        status: readString(row.status) ?? "entwurf",
+        publishedUntil: readString(row.published_until),
         imageUrl: images[0]?.url ?? null,
       },
     ];
@@ -91,11 +96,20 @@ export async function getOwnedDraft(userId: string, id: string): Promise<OwnedDr
     return path ? [{ path, previewUrl: image.url }] : [];
   });
 
+  const status = readString(data.status) ?? "entwurf";
+  const publishedUntil = readString(data.published_until);
+
   return {
     id,
+    status,
+    publishedUntil,
     values: listingFormValues(data, firstRecord(data.vehicle_camper_details)),
     images,
   };
+}
+
+export function listingNeedsPayment(status: string, publishedUntil: string | null): boolean {
+  return !isPublicListing(status, publishedUntil);
 }
 
 function imageEntries(value: unknown): { url: string; main: boolean }[] {

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { isListingCategory } from "@/lib/listing-options";
 import { hideIrrelevant } from "@/lib/listing-sections";
 import { listingSubmitSchema, type NormalizedListing } from "@/lib/listing-schema";
+import { beginCheckout } from "@/actions/checkout";
+import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
 import { publicImageUrl, storagePathFromPublicUrl } from "@/lib/vehicle-images";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -12,7 +14,7 @@ import { createClient } from "@/utils/supabase/server";
 
 const saveError = "Das Inserat konnte nicht gespeichert werden.";
 
-export async function createListing(input: unknown): Promise<{ error: string }> {
+export async function createListing(input: unknown): Promise<{ error: string } | void> {
   const prepared = await prepareListing(input);
   if ("error" in prepared) {
     return prepared;
@@ -21,7 +23,7 @@ export async function createListing(input: unknown): Promise<{ error: string }> 
   const { supabase, userId, listing, imageUrls } = prepared;
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .insert({ user_id: userId, status: "aktiv", ...vehicleColumns(listing) })
+    .insert({ user_id: userId, status: "entwurf", ...vehicleColumns(listing) })
     .select("id")
     .single();
 
@@ -47,10 +49,10 @@ export async function createListing(input: unknown): Promise<{ error: string }> 
   }
 
   refreshListing(vehicle.id);
-  redirect(`/fahrzeug/${vehicle.id}`);
+  await beginCheckout(vehicle.id);
 }
 
-export async function updateListing(id: string, input: unknown): Promise<{ error: string }> {
+export async function updateListing(id: string, input: unknown): Promise<{ error: string } | void> {
   if (!isVehicleId(id)) {
     return { error: saveError };
   }
@@ -63,7 +65,7 @@ export async function updateListing(id: string, input: unknown): Promise<{ error
   const { supabase, userId, listing, imageUrls } = prepared;
   const { data: owned, error: ownedError } = await supabase
     .from("vehicles")
-    .select("id, vehicle_images(url)")
+    .select("id, status, published_until, vehicle_images(url)")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -124,7 +126,13 @@ export async function updateListing(id: string, input: unknown): Promise<{ error
   }
 
   refreshListing(id);
-  redirect(`/fahrzeug/${id}`);
+  const status = typeof owned.status === "string" ? owned.status : "entwurf";
+  const publishedUntil = typeof owned.published_until === "string" ? owned.published_until : null;
+  if (isPublicListing(status, publishedUntil)) {
+    redirect(`/fahrzeug/${id}`);
+  }
+
+  await beginCheckout(id);
 }
 
 export async function deleteListing(

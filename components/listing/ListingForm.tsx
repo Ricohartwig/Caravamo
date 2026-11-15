@@ -15,9 +15,15 @@ type ListingFormProps = {
   listingId?: string;
   initialValues?: ListingFormInput;
   initialImages?: UploadedImage[];
+  requiresPayment?: boolean;
 };
 
-export function ListingForm({ listingId, initialValues, initialImages = [] }: ListingFormProps) {
+export function ListingForm({
+  listingId,
+  initialValues,
+  initialImages = [],
+  requiresPayment = !listingId,
+}: ListingFormProps) {
   const [images, setImages] = useState<UploadedImage[]>(initialImages);
   const [uploading, setUploading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -93,7 +99,7 @@ export function ListingForm({ listingId, initialValues, initialImages = [] }: Li
         disabled={isSubmitting || uploading}
         className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-copper-dark px-5 text-sm font-semibold text-foam hover:bg-copper disabled:opacity-70 sm:w-auto"
       >
-        {isSubmitting ? "Inserat wird gespeichert" : listingId ? "Änderungen speichern" : "Inserat veröffentlichen"}
+        {isSubmitting ? "Bitte warten" : submitLabel(Boolean(listingId), requiresPayment)}
       </button>
     </form>
   );
@@ -255,6 +261,14 @@ function messageFor(errors: FieldErrors<ListingFormInput>, name: keyof ListingFo
   }
 
   return null;
+}
+
+function submitLabel(editing: boolean, requiresPayment: boolean): string {
+  if (!requiresPayment) {
+    return "Änderungen speichern";
+  }
+
+  return editing ? "Speichern und bezahlen" : "Weiter zur Zahlung";
 }
 
 function payloadKg(gross: string, curb: string): number | null {

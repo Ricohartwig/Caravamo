@@ -14,7 +14,7 @@ export default function InserierenPage() {
         Fahrzeug einstellen
       </h1>
       <p className="mt-4 text-lg leading-8 text-muted">
-        Die Angaben gehören zu deinem Konto. Was zur Fahrzeugart nicht passt, bleibt ausgeblendet und wird nicht gespeichert.
+        Die Angaben gehören zu deinem Konto. Danach geht es zur Bezahlung. Öffentlich wird das Inserat erst, wenn Stripe die Zahlung bestätigt: 4,99 € für Privat und 6,99 € für Händler, jeweils 30 Tage.
       </p>
       <ListingForm />
     </div>
