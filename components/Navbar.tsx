@@ -11,7 +11,7 @@ export type NavbarUser = {
 
 const links = [
   { href: "/suche", label: "Fahrzeuge suchen" },
-  { href: "/haendler", label: "Für Händler" },
+  { href: "/haendler", label: "Händler" },
 ] as const;
 
 export function Navbar({ user }: { user: NavbarUser | null }) {

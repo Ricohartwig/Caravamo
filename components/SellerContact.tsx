@@ -9,7 +9,9 @@ import type { CardMarks } from "@/lib/account";
 type SellerContactProps = {
   sellerName: string;
   sellerKind: string;
-  sellerCity: string | null;
+  sellerPlace: string | null;
+  sellerAbout: string | null;
+  sellerHref: string | null;
   sellerId: string;
   vehicleId: string;
   viewerId: string | null;
@@ -19,7 +21,9 @@ type SellerContactProps = {
 export function SellerContact({
   sellerName,
   sellerKind,
-  sellerCity,
+  sellerPlace,
+  sellerAbout,
+  sellerHref,
   sellerId,
   vehicleId,
   viewerId,
@@ -30,13 +34,27 @@ export function SellerContact({
   return (
     <aside className="h-fit rounded-2xl border border-line bg-card p-5 lg:sticky lg:top-24">
       <p className="text-sm font-medium text-muted">Verkäufer</p>
-      <h2 className="mt-1 text-lg font-semibold">{sellerName}</h2>
+      <h2 className="mt-1 text-lg font-semibold">
+        {sellerHref ? (
+          <Link href={sellerHref} className="hover:underline">
+            {sellerName}
+          </Link>
+        ) : (
+          sellerName
+        )}
+      </h2>
       <p className="mt-1 text-sm text-muted">{sellerKind}</p>
-      {sellerCity ? (
+      {sellerPlace ? (
         <p className="mt-3 flex items-center gap-2 text-sm">
           <MapPin aria-hidden="true" className="size-4 text-pine" />
-          {sellerCity}
+          {sellerPlace}
         </p>
+      ) : null}
+      {sellerAbout ? <p className="mt-3 line-clamp-4 text-sm leading-6">{sellerAbout}</p> : null}
+      {sellerHref ? (
+        <Link href={sellerHref} className="mt-3 inline-flex text-sm font-semibold text-pine hover:underline">
+          Händlerseite
+        </Link>
       ) : null}
       <div className="mt-5">
         <VehicleActions vehicleId={vehicleId} marks={marks} variant="stack" />

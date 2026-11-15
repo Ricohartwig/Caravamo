@@ -31,6 +31,9 @@ export type PublishedListing = {
   sellerName: string;
   sellerKind: "Privat" | "Händler";
   sellerCity: string | null;
+  sellerPlace: string | null;
+  sellerAbout: string | null;
+  sellerHref: string | null;
   values: Record<string, unknown>;
 };
 
@@ -231,28 +234,50 @@ export const getPublishedListing = cache(async (id: string): Promise<PublishedLi
     sellerName: seller.name,
     sellerKind: seller.kind,
     sellerCity: seller.city,
+    sellerPlace: seller.place,
+    sellerAbout: seller.about,
+    sellerHref: seller.href,
     values: { ...data, ...(details ?? {}) },
   };
 });
 
-async function readSeller(
-  userId: string | null,
-): Promise<{ name: string; kind: "Privat" | "Händler"; city: string | null }> {
+async function readSeller(userId: string | null): Promise<{
+  name: string;
+  kind: "Privat" | "Händler";
+  city: string | null;
+  place: string | null;
+  about: string | null;
+  href: string | null;
+}> {
+  const fallback = { name: "Privater Anbieter", kind: "Privat" as const, city: null, place: null, about: null, href: null };
   if (!userId) {
-    return { name: "Privater Anbieter", kind: "Privat", city: null };
+    return fallback;
   }
 
   const supabase = createPublicClient();
-  const { data } = await supabase.from("seller_profiles").select("name, role, city").eq("id", userId).maybeSingle();
+  const { data } = await supabase
+    .from("seller_profiles")
+    .select("name, role, city, postal_code, company_name, about")
+    .eq("id", userId)
+    .maybeSingle();
   if (!isRecord(data)) {
-    return { name: "Privater Anbieter", kind: "Privat", city: null };
+    return fallback;
   }
 
   const role = readString(data.role)?.toLowerCase();
+  const business = role === "haendler" || role === "händler";
+  const city = readString(data.city);
+  const company = readString(data.company_name);
+  const postalCode = readString(data.postal_code);
+  const place = [postalCode, city].filter(Boolean).join(" ") || null;
+
   return {
-    name: readString(data.name) ?? "Privater Anbieter",
-    kind: role === "haendler" || role === "händler" ? "Händler" : "Privat",
-    city: readString(data.city),
+    name: (business ? company : null) ?? readString(data.name) ?? "Privater Anbieter",
+    kind: business ? "Händler" : "Privat",
+    city,
+    place,
+    about: readString(data.about),
+    href: business && company && city ? `/haendler/${userId}` : null,
   };
 }
 

@@ -128,7 +128,7 @@ export async function signUp(
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-      data: { name, role: "privat" },
+      data: { name, role: readField(formData, "role") === "haendler" ? "haendler" : "privat" },
     },
   });
 

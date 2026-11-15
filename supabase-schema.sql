@@ -122,11 +122,14 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  chosen text;
 begin
+  chosen := lower(coalesce(new.raw_user_meta_data ->> 'role', 'privat'));
   insert into public.users (id, role, name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'role', 'privat'),
+    case when chosen in ('haendler', 'händler') then 'haendler' else 'privat' end,
     coalesce(
       new.raw_user_meta_data ->> 'name',
       new.raw_user_meta_data ->> 'full_name',
@@ -388,10 +391,72 @@ from public.users;
 grant select on public.seller_profiles to anon, authenticated;
 
 alter table public.users add column if not exists city text;
+alter table public.users add column if not exists postal_code text;
+alter table public.users add column if not exists street text;
+alter table public.users add column if not exists company_name text;
+alter table public.users add column if not exists website text;
+alter table public.users add column if not exists about text;
+alter table public.users add column if not exists opening_hours text;
+alter table public.users add column if not exists vat_id text;
+alter table public.users add column if not exists services text[] not null default '{}';
+
+alter table public.users drop constraint if exists users_postal_code_shape;
+alter table public.users add constraint users_postal_code_shape
+  check (postal_code is null or postal_code ~ '^[0-9]{5}$');
+
+alter table public.users drop constraint if exists users_street_length;
+alter table public.users add constraint users_street_length
+  check (street is null or char_length(street) between 1 and 120);
+
+alter table public.users drop constraint if exists users_company_name_length;
+alter table public.users add constraint users_company_name_length
+  check (company_name is null or char_length(company_name) between 2 and 120);
+
+alter table public.users drop constraint if exists users_website_shape;
+alter table public.users add constraint users_website_shape
+  check (website is null or website ~ '^https://[^[:space:]]{1,180}$');
+
+alter table public.users drop constraint if exists users_about_length;
+alter table public.users add constraint users_about_length
+  check (about is null or char_length(about) between 1 and 800);
+
+alter table public.users drop constraint if exists users_opening_hours_length;
+alter table public.users add constraint users_opening_hours_length
+  check (opening_hours is null or char_length(opening_hours) between 1 and 240);
+
+alter table public.users drop constraint if exists users_vat_id_shape;
+alter table public.users add constraint users_vat_id_shape
+  check (vat_id is null or vat_id ~ '^DE[0-9]{9}$');
+
+alter table public.users drop constraint if exists users_services_known;
+alter table public.users add constraint users_services_known
+  check (services <@ array['finanzierung','inzahlungnahme','werkstatt','lieferung']::text[]);
 
 create or replace view public.seller_profiles as
-select id, name, role, city
+select id, name, role, city, postal_code, company_name, about
 from public.users;
+
+create or replace view public.dealer_profiles as
+select
+  id,
+  company_name,
+  name as contact_name,
+  phone,
+  street,
+  postal_code,
+  city,
+  website,
+  about,
+  opening_hours,
+  vat_id,
+  services,
+  created_at
+from public.users
+where lower(coalesce(role, '')) in ('haendler', 'händler')
+  and nullif(btrim(company_name), '') is not null
+  and nullif(btrim(city), '') is not null;
+
+grant select on public.dealer_profiles to anon, authenticated;
 
 -- Der Ort darf im Exposé stehen. Die Rolle bestimmt den Inseratspreis und
 -- bleibt an der Anmeldung hängen.

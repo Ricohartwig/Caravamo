@@ -1,6 +1,15 @@
 import { parseStoredFilters, searchHref, type VehicleFilters } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
+import {
+  dealerPageReady,
+  emptyProfile,
+  profileGaps,
+  type DealerService,
+  type ProfileFields,
+  type ProfileGap,
+} from "@/lib/profile";
+import { isBusinessRole } from "@/lib/stripe";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
 
@@ -9,12 +18,12 @@ export type AccountUser = {
   email: string;
 };
 
-export type AccountProfile = {
-  name: string;
-  phone: string;
-  city: string;
+export type AccountProfile = ProfileFields & {
   roleLabel: "Privat" | "Händler";
   business: boolean;
+  memberSince: string;
+  gaps: ProfileGap[];
+  publicDealerPage: boolean;
 };
 
 export type AccountCounts = {
@@ -176,16 +185,34 @@ export async function accountCounts(userId: string): Promise<AccountCounts> {
 
 export async function accountProfile(userId: string): Promise<AccountProfile> {
   const supabase = await createClient();
-  const { data } = await supabase.from("users").select("name, phone, city, role").eq("id", userId).maybeSingle();
-  const role = readString(data?.role)?.toLowerCase();
-  const business = role === "haendler" || role === "händler";
-
-  return {
+  const { data } = await supabase
+    .from("users")
+    .select("name, phone, city, postal_code, street, company_name, website, about, opening_hours, vat_id, services, role, created_at")
+    .eq("id", userId)
+    .maybeSingle();
+  const business = isBusinessRole(readString(data?.role));
+  const fields: ProfileFields = {
+    ...emptyProfile(),
     name: readString(data?.name) ?? "",
     phone: readString(data?.phone) ?? "",
     city: readString(data?.city) ?? "",
+    postalCode: readString(data?.postal_code) ?? "",
+    street: readString(data?.street) ?? "",
+    companyName: readString(data?.company_name) ?? "",
+    website: readString(data?.website) ?? "",
+    about: readString(data?.about) ?? "",
+    openingHours: readString(data?.opening_hours) ?? "",
+    vatId: readString(data?.vat_id) ?? "",
+    services: readServices(data?.services),
+  };
+
+  return {
+    ...fields,
     roleLabel: business ? "Händler" : "Privat",
     business,
+    memberSince: readString(data?.created_at) ?? "",
+    gaps: profileGaps(fields, business),
+    publicDealerPage: dealerPageReady(fields, business),
   };
 }
 
@@ -610,6 +637,16 @@ function firstRecord(value: unknown): Record<string, unknown> | null {
   }
 
   return isRecord(value) ? value : null;
+}
+
+function readServices(value: unknown): DealerService[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) =>
+    entry === "finanzierung" || entry === "inzahlungnahme" || entry === "werkstatt" || entry === "lieferung" ? [entry] : [],
+  );
 }
 
 function readString(value: unknown): string | null {

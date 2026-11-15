@@ -28,8 +28,7 @@ async function RegisterContent({
     <div className="mx-auto w-full max-w-lg px-4 py-12 sm:py-16">
       <h1 className="text-3xl font-semibold tracking-tight">Konto anlegen</h1>
       <p className="mt-4 leading-7 text-muted">
-        Mit dem Konto gehört ein Inserat dir. Google und E-Mail mit Passwort
-        funktionieren beide.
+        Privatkunden und Händler nutzen dasselbe Konto. Die Kontoart wählst du hier, sie bestimmt den Preis eines Inserats und die öffentliche Händlerseite.
       </p>
       <AuthForm mode="register" nextPath={nextPath} notice={null} />
     </div>
