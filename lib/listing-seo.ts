@@ -6,7 +6,7 @@ const descriptionLimit = 160;
 
 export function listingTitle(listing: Pick<PublishedListing, "title" | "price" | "sellerCity">): string {
   const place = listing.sellerCity ? ` in ${listing.sellerCity}` : "";
-  return `Kaufen: ${listing.title} - ${plainPrice(listing.price)}${place}`;
+  return `${listing.title} kaufen für ${plainPrice(listing.price)}${place}`;
 }
 
 export function listingDescription(listing: PublishedListing): string {
@@ -21,10 +21,6 @@ export function listingDescription(listing: PublishedListing): string {
   return `${text.slice(0, descriptionLimit - 1).trimEnd()}…`;
 }
 
-export function vehicleSchemaType(type: string): "Car" | "Vehicle" {
-  return type === "Wohnmobil" ? "Car" : "Vehicle";
-}
-
 export function vehicleJsonLd(listing: PublishedListing): Record<string, unknown> {
   const path = `/fahrzeug/${listing.id}`;
   const model = readString(listing.values.model);
@@ -36,7 +32,7 @@ export function vehicleJsonLd(listing: PublishedListing): Record<string, unknown
 
   return compact({
     "@context": "https://schema.org",
-    "@type": vehicleSchemaType(listing.type),
+    "@type": "Vehicle",
     name: listing.title,
     brand: { "@type": "Brand", name: listing.brand },
     model: model ?? undefined,

@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { blankFilters, camperFilterActive, type VehicleFilters } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
+import { createPublicClient } from "@/utils/supabase/public";
 import { createClient } from "@/utils/supabase/server";
 
 export type OfferCard = {
@@ -192,7 +193,7 @@ export const getPublishedListing = cache(async (id: string): Promise<PublishedLi
 
   await connection();
   const now = Date.now();
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("vehicles")
     .select("*, vehicle_camper_details(*), vehicle_images(url, is_main)")
@@ -241,7 +242,7 @@ async function readSeller(
     return { name: "Privater Anbieter", kind: "Privat", city: null };
   }
 
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase.from("seller_profiles").select("name, role, city").eq("id", userId).maybeSingle();
   if (!isRecord(data)) {
     return { name: "Privater Anbieter", kind: "Privat", city: null };

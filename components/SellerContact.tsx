@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
+import { ContactForm } from "@/components/ContactForm";
 import { InquiryForm } from "@/components/account/InquiryForm";
 import { isMailConfigured } from "@/lib/mail";
 import { VehicleActions } from "@/components/account/VehicleActions";
@@ -51,12 +52,15 @@ export function SellerContact({
       ) : viewerId ? (
         <InquiryForm vehicleId={vehicleId} mailReady={isMailConfigured()} />
       ) : (
-        <Link
-          href={`/login?next=${encodeURIComponent(`/fahrzeug/${vehicleId}`)}`}
-          className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-copper-dark px-4 text-sm font-semibold text-foam hover:bg-copper"
-        >
-          Anmelden und anfragen
-        </Link>
+        <>
+          <ContactForm vehicleId={vehicleId} />
+          <Link
+            href={`/login?next=${encodeURIComponent(`/fahrzeug/${vehicleId}`)}`}
+            className="mt-3 inline-flex text-sm font-medium text-pine hover:underline"
+          >
+            Mit Konto anfragen
+          </Link>
+        </>
       )}
     </aside>
   );

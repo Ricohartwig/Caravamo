@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { listingDescription, listingTitle, serializeJsonLd, vehicleJsonLd } from "@/lib/listing-seo";
+import { listingDescription, listingTitle } from "@/lib/listing-seo";
 import { getPublishedListing } from "@/lib/published-listings";
 import { absoluteUrl } from "@/lib/site";
 
@@ -43,7 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });`,
         }}
       />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(vehicleJsonLd(listing)) }} />
     </>
   );
 }
