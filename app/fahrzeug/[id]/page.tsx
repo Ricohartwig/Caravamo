@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { JsonLd } from "@/components/JsonLd";
 import { PublishedExpose } from "@/components/PublishedExpose";
 import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
 import { listingDescription, listingTitle } from "@/lib/listing-seo";
@@ -75,16 +76,19 @@ async function VehicleExpose({
   const saved = viewer ? await loadCardMarks(`/fahrzeug/${listing.id}`) : null;
 
   return (
-    <PublishedExpose
-      listing={listing}
-      viewerId={viewer?.id ?? null}
-      marks={{
-        signedIn: Boolean(viewer),
-        saved: saved?.favorites.has(listing.id) ?? false,
-        compared: saved?.comparisons.has(listing.id) ?? false,
-        returnTo: `/fahrzeug/${listing.id}`,
-      }}
-    />
+    <>
+      <JsonLd vehicle={listing} />
+      <PublishedExpose
+        listing={listing}
+        viewerId={viewer?.id ?? null}
+        marks={{
+          signedIn: Boolean(viewer),
+          saved: saved?.favorites.has(listing.id) ?? false,
+          compared: saved?.comparisons.has(listing.id) ?? false,
+          returnTo: `/fahrzeug/${listing.id}`,
+        }}
+      />
+    </>
   );
 }
 
