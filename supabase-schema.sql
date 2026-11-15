@@ -1,12 +1,14 @@
--- Caravamo: Grundschema für den Fahrzeug-Marktplatz.
--- Die UUID-Primärschlüssel bekommen gen_random_uuid(), damit Inserts ohne
--- manuelle IDs funktionieren. Policies bleiben auskommentiert.
+-- Caravamo: Schema für den Fahrzeug-Marktplatz mit Anmeldung.
+-- Wohnmobile, Wohnwagen, Pkw und Transporter liegen in public.vehicles.
+-- Der Fahrzeugtyp steht in vehicles.type, zum Beispiel 'Wohnmobil'.
+-- Eine eigene Wohnmobil-Tabelle gibt es nicht, damit jedes Inserat genau
+-- einem angemeldeten Nutzer gehört.
 
 create extension if not exists pgcrypto;
 
 create table if not exists public.users (
-  id uuid primary key default gen_random_uuid(),
-  role text,
+  id uuid primary key references auth.users (id) on delete cascade,
+  role text default 'privat',
   name text,
   phone text,
   created_at timestamptz default now()
@@ -14,7 +16,7 @@ create table if not exists public.users (
 
 create table if not exists public.vehicles (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.users (id),
+  user_id uuid references public.users (id) on delete cascade,
   brand text,
   model text,
   type text,
@@ -34,35 +36,190 @@ create table if not exists public.vehicle_images (
   created_at timestamptz default now()
 );
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.users (id, role, name)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'role', 'privat'),
+    coalesce(
+      new.raw_user_meta_data ->> 'name',
+      new.raw_user_meta_data ->> 'full_name',
+      split_part(coalesce(new.email, ''), '@', 1)
+    )
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 alter table public.users enable row level security;
 alter table public.vehicles enable row level security;
 alter table public.vehicle_images enable row level security;
 
--- RLS: Jeder darf Fahrzeuge lesen.
--- create policy "vehicles_select_public"
---   on public.vehicles
---   for select
---   using (true);
+drop policy if exists "users_select_own" on public.users;
+drop policy if exists "users_update_own" on public.users;
+drop policy if exists "vehicles_select_public" on public.vehicles;
+drop policy if exists "vehicles_insert_own" on public.vehicles;
+drop policy if exists "vehicles_update_own" on public.vehicles;
+drop policy if exists "vehicle_images_select_public" on public.vehicle_images;
+drop policy if exists "vehicle_images_insert_own" on public.vehicle_images;
+drop policy if exists "vehicle_images_update_own" on public.vehicle_images;
+drop policy if exists "vehicle_images_delete_own" on public.vehicle_images;
 
--- create policy "vehicle_images_select_public"
---   on public.vehicle_images
---   for select
---   using (true);
+-- Jeder darf Fahrzeuge und Bilder lesen.
+create policy "vehicles_select_public"
+  on public.vehicles
+  for select
+  using (true);
 
--- RLS: Nur authentifizierte Nutzer dürfen eigene Fahrzeuge erstellen und bearbeiten.
--- user_id soll dabei der Auth-User-ID entsprechen.
--- create policy "vehicles_insert_own"
---   on public.vehicles
---   for insert
---   to authenticated
---   with check (auth.uid() = user_id);
+create policy "vehicle_images_select_public"
+  on public.vehicle_images
+  for select
+  using (true);
 
--- create policy "vehicles_update_own"
---   on public.vehicles
---   for update
---   to authenticated
---   using (auth.uid() = user_id)
---   with check (auth.uid() = user_id);
+-- Nur authentifizierte Nutzer dürfen eigene Fahrzeuge erstellen und bearbeiten.
+create policy "vehicles_insert_own"
+  on public.vehicles
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
 
--- Profil-Policies für public.users folgen mit der Authentifizierung.
--- Solange keine Policy existiert, bleibt die Tabelle über die Data API geschlossen.
+create policy "vehicles_update_own"
+  on public.vehicles
+  for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "users_select_own"
+  on public.users
+  for select
+  to authenticated
+  using (auth.uid() = id);
+
+create policy "users_update_own"
+  on public.users
+  for update
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+create policy "vehicle_images_insert_own"
+  on public.vehicle_images
+  for insert
+  to authenticated
+  with check (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_images.vehicle_id
+        and vehicles.user_id = auth.uid()
+    )
+  );
+
+create policy "vehicle_images_update_own"
+  on public.vehicle_images
+  for update
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_images.vehicle_id
+        and vehicles.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_images.vehicle_id
+        and vehicles.user_id = auth.uid()
+    )
+  );
+
+create policy "vehicle_images_delete_own"
+  on public.vehicle_images
+  for delete
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.vehicles
+      where vehicles.id = vehicle_images.vehicle_id
+        and vehicles.user_id = auth.uid()
+    )
+  );
+
+grant select, update on public.users to authenticated;
+grant select on public.vehicles to anon, authenticated;
+grant insert, update on public.vehicles to authenticated;
+grant select on public.vehicle_images to anon, authenticated;
+grant insert, update, delete on public.vehicle_images to authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'vehicle-images',
+  'vehicle-images',
+  true,
+  10485760,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = true,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "vehicle_images_bucket_read" on storage.objects;
+drop policy if exists "vehicle_images_bucket_insert" on storage.objects;
+drop policy if exists "vehicle_images_bucket_update" on storage.objects;
+drop policy if exists "vehicle_images_bucket_delete" on storage.objects;
+
+create policy "vehicle_images_bucket_read"
+  on storage.objects
+  for select
+  to public
+  using (bucket_id = 'vehicle-images');
+
+create policy "vehicle_images_bucket_insert"
+  on storage.objects
+  for insert
+  to authenticated
+  with check (
+    bucket_id = 'vehicle-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "vehicle_images_bucket_update"
+  on storage.objects
+  for update
+  to authenticated
+  using (
+    bucket_id = 'vehicle-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'vehicle-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "vehicle_images_bucket_delete"
+  on storage.objects
+  for delete
+  to authenticated
+  using (
+    bucket_id = 'vehicle-images'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
