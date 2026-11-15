@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { currentUser, searchLimit } from "@/lib/account";
 import { mailInquiry } from "@/lib/inquiry-mail";
-import { parseFilters, searchHref, searchTitle } from "@/lib/filters";
+import { parseFilters, parseStoredFilters, searchHref, searchTitle } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
 import { searchOffers } from "@/lib/published-listings";
@@ -108,6 +108,16 @@ export async function saveSearch(formData: FormData): Promise<void> {
     body: String(formData.get("body") ?? ""),
     price_min: String(formData.get("price_min") ?? ""),
     price_max: String(formData.get("price_max") ?? ""),
+    weight_max: String(formData.get("weight_max") ?? ""),
+    solar: String(formData.get("solar") ?? ""),
+    inverter: String(formData.get("inverter") ?? ""),
+    awning: String(formData.get("awning") ?? ""),
+    air: String(formData.get("air") ?? ""),
+    fuel: String(formData.get("fuel") ?? ""),
+    transmission: String(formData.get("transmission") ?? ""),
+    bed: String(formData.get("bed") ?? ""),
+    climate: String(formData.get("climate") ?? ""),
+    sleep_min: String(formData.get("sleep_min") ?? ""),
   });
   const returnTo = searchHref(filters);
   if (!user) {
@@ -172,14 +182,7 @@ export async function openSavedSearch(formData: FormData): Promise<void> {
 
   const supabase = await createClient();
   const { data } = await supabase.from("saved_searches").select("filters").eq("id", id).eq("user_id", user.id).maybeSingle();
-  const filters = parseFilters({
-    brand: readFilter(data?.filters, "brand"),
-    model: readFilter(data?.filters, "model"),
-    type: readFilter(data?.filters, "type"),
-    body: readFilter(data?.filters, "body"),
-    price_min: readFilter(data?.filters, "priceMin"),
-    price_max: readFilter(data?.filters, "priceMax"),
-  });
+  const filters = parseStoredFilters(data?.filters);
   const matches = await searchOffers(filters);
   await supabase.from("saved_searches").update({ last_count: matches.length }).eq("id", id).eq("user_id", user.id);
   refreshAccount();
@@ -376,15 +379,6 @@ async function publicPrice(vehicleId: string): Promise<number | null> {
 
   const price = typeof data.price === "number" ? data.price : Number(data.price);
   return Number.isFinite(price) ? price : null;
-}
-
-function readFilter(value: unknown, key: string): string {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return "";
-  }
-
-  const entry = (value as Record<string, unknown>)[key];
-  return typeof entry === "number" || typeof entry === "string" ? String(entry) : "";
 }
 
 function refreshAccount(vehicleId?: string) {
