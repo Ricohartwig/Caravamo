@@ -47,6 +47,7 @@ alter table public.vehicles add column if not exists speed_100 boolean;
 alter table public.vehicles add column if not exists first_registration date;
 alter table public.vehicles add column if not exists published_until timestamptz;
 alter table public.vehicles add column if not exists stripe_session_id text;
+alter table public.vehicles add column if not exists view_count integer not null default 0;
 
 create unique index if not exists vehicles_stripe_session_id_key
   on public.vehicles (stripe_session_id)
@@ -294,8 +295,8 @@ create policy "vehicle_camper_details_select_public"
     )
   );
 
--- Normale Anmeldungen können den Status, die Laufzeit und die Stripe-Sitzung
--- nicht selbst auf bezahlt setzen. Das darf der Webhook mit dem Service-Role-Schlüssel.
+-- Die Laufzeit und die Stripe-Sitzung setzt nur der Webhook. Der Besitzer darf
+-- ein bezahltes Inserat pausieren, wieder online stellen oder als verkauft markieren.
 create or replace function public.guard_vehicle_publication()
 returns trigger
 language plpgsql
@@ -310,18 +311,73 @@ begin
     new.status := 'entwurf';
     new.published_until := null;
     new.stripe_session_id := null;
+    new.view_count := 0;
     return new;
   end if;
 
-  if new.status is distinct from old.status
-     or new.published_until is distinct from old.published_until
+  if new.published_until is distinct from old.published_until
      or new.stripe_session_id is distinct from old.stripe_session_id then
-    raise exception 'Inserate werden erst nach der bestätigten Zahlung veröffentlicht';
+    raise exception 'Laufzeit und Zahlung setzt nur die bestätigte Zahlung';
+  end if;
+
+  if new.status is not distinct from old.status then
+    return new;
+  end if;
+
+  if new.status not in ('aktiv', 'inaktiv', 'verkauft') then
+    raise exception 'Dieser Status ist nicht erlaubt';
+  end if;
+
+  if coalesce(old.status, 'entwurf') = 'entwurf' then
+    raise exception 'Ein Entwurf wird erst nach der Zahlung veröffentlicht';
+  end if;
+
+  if coalesce(old.status, 'entwurf') not in ('aktiv', 'inaktiv', 'verkauft') then
+    raise exception 'Dieser Status ist nicht erlaubt';
+  end if;
+
+  if new.status = 'aktiv'
+     and (old.published_until is null or old.published_until <= now()) then
+    raise exception 'Die Laufzeit ist abgelaufen';
   end if;
 
   return new;
 end;
 $$;
+
+create or replace function public.bump_listing_view(listing_id uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.vehicles
+  set view_count = view_count + 1
+  where id = listing_id
+    and status = 'aktiv'
+    and (published_until is null or published_until > now());
+$$;
+
+revoke all on function public.bump_listing_view(uuid) from public;
+grant execute on function public.bump_listing_view(uuid) to anon, authenticated;
+
+create or replace function public.owner_listing_signals(listing_ids uuid[])
+returns table (vehicle_id uuid, inquiries bigint, saves bigint)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select v.id,
+    (select count(*) from public.inquiries i where i.vehicle_id = v.id and i.recipient_id = v.user_id),
+    (select count(*) from public.favorites f where f.vehicle_id = v.id)
+  from public.vehicles v
+  where v.user_id = auth.uid()
+    and v.id = any (listing_ids);
+$$;
+
+revoke all on function public.owner_listing_signals(uuid[]) from public;
+grant execute on function public.owner_listing_signals(uuid[]) to authenticated;
 
 drop trigger if exists guard_vehicle_publication on public.vehicles;
 

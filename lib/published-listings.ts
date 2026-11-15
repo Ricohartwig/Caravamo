@@ -2,6 +2,7 @@ import { cache } from "react";
 import { connection } from "next/server";
 import { blankFilters, camperFilterActive, type VehicleFilters } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
+import { isVehicleId } from "@/lib/owned-listings";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createPublicClient } from "@/utils/supabase/public";
 import { createClient } from "@/utils/supabase/server";
@@ -211,6 +212,30 @@ export const getPublishedListing = cache(async (id: string): Promise<PublishedLi
     return null;
   }
 
+  return toPublishedListing(id, data);
+});
+
+export async function getOwnedPreview(userId: string, id: string): Promise<PublishedListing | null> {
+  if (!isSupabaseConfigured() || !isVehicleId(id)) {
+    return null;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("vehicles")
+    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main)")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !isRecord(data)) {
+    return null;
+  }
+
+  return toPublishedListing(id, data);
+}
+
+async function toPublishedListing(id: string, data: Record<string, unknown>): Promise<PublishedListing | null> {
   const brand = readString(data.brand) ?? "Fahrzeug";
   const model = readString(data.model) ?? "";
   const price = readNumber(data.price);
@@ -239,7 +264,7 @@ export const getPublishedListing = cache(async (id: string): Promise<PublishedLi
     sellerHref: seller.href,
     values: { ...data, ...(details ?? {}) },
   };
-});
+}
 
 async function readSeller(userId: string | null): Promise<{
   name: string;

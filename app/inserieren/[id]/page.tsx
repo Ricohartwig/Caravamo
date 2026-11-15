@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ListingForm } from "@/components/listing/ListingForm";
-import { getOwnedDraft, isVehicleId, listingNeedsPayment } from "@/lib/owned-listings";
+import { listingNeedsPayment } from "@/lib/listing-state";
+import { getOwnedDraft, isVehicleId } from "@/lib/owned-listings";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
@@ -45,7 +46,7 @@ async function EditListing({ params }: { params: Promise<{ id: string }> }) {
         Die gespeicherten Angaben stehen wieder im Formular. Entfernte Bilder werden beim Speichern aus dem Speicher gelöscht.
         {requiresPayment
           ? " Dieses Inserat ist noch nicht öffentlich. Nach dem Speichern geht es zur Bezahlung."
-          : ""}
+          : " Die bezahlte Laufzeit bleibt. Speichern startet keine neue Zahlung."}
       </p>
       <ListingForm
         listingId={draft.id}
