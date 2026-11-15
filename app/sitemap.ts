@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { listDealerSitemap } from "@/lib/dealers";
 import { listSitemapListings } from "@/lib/published-listings";
 import { absoluteUrl } from "@/lib/site";
 
@@ -16,7 +17,7 @@ const staticPages: Array<{
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const listings = await listSitemapListings();
+  const [listings, dealers] = await Promise.all([listSitemapListings(), listDealerSitemap()]);
 
   return [
     ...staticPages.map((page) => ({
@@ -30,6 +31,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.8,
       images: listing.imageUrls.length > 0 ? listing.imageUrls : undefined,
+    })),
+    ...dealers.map((dealer) => ({
+      url: absoluteUrl(`/haendler/${dealer.id}`),
+      lastModified: dealer.updatedAt ?? undefined,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
     })),
   ];
 }

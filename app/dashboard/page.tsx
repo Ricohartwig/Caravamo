@@ -82,6 +82,18 @@ async function Overview({
           {notice}
         </p>
       ) : null}
+      <Link href="/dashboard/profil" className="mt-4 block rounded-2xl border border-line bg-card px-4 py-3 hover:bg-sand">
+        <p className="text-sm font-semibold">
+          {profile.gaps.length === 0 ? "Profil vollständig" : `Profil ${profile.business ? 10 - profile.gaps.length : 5 - profile.gaps.length} von ${profile.business ? 10 : 5}`}
+        </p>
+        <p className="mt-1 text-sm text-muted">
+          {profile.gaps.length === 0
+            ? profile.publicDealerPage
+              ? "Deine Händlerseite ist öffentlich."
+              : "Name, Kontakt und Ort sind hinterlegt."
+            : `Es fehlt noch: ${profile.gaps.map((gap) => gap.label).join(", ")}.`}
+        </p>
+      </Link>
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {cards.map((card) => (
           <li key={card.href}>

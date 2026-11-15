@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { currentUser, searchLimit } from "@/lib/account";
+import { accountProfile, currentUser, searchLimit } from "@/lib/account";
 import { mailInquiry } from "@/lib/inquiry-mail";
 import { parseFilters, parseStoredFilters, searchHref, searchTitle } from "@/lib/filters";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
+import { parseProfile, profileRow } from "@/lib/profile";
 import { searchOffers } from "@/lib/published-listings";
 import { safeNextPath } from "@/lib/auth-redirect";
 import { createClient } from "@/utils/supabase/server";
@@ -321,15 +322,14 @@ export async function markInquiryRead(inquiryId: string, userId: string): Promis
 
 export async function updateProfile(formData: FormData): Promise<void> {
   const user = await requireAccount("/dashboard/profil");
-  const name = String(formData.get("name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
-  const city = String(formData.get("city") ?? "").trim();
-  if (name.length < 2 || name.length > 80 || phone.length > 40 || city.length > 80) {
-    redirect("/dashboard/profil?hinweis=ungueltig");
+  const profile = await accountProfile(user.id);
+  const parsed = parseProfile(formData, profile.business);
+  if (!parsed.ok) {
+    redirect(`/dashboard/profil?hinweis=${parsed.code}`);
   }
 
   const { error } = await createClient().then((supabase) =>
-    supabase.from("users").update({ name, phone: phone || null, city: city || null }).eq("id", user.id),
+    supabase.from("users").update(profileRow(parsed.fields, profile.business)).eq("id", user.id),
   );
   refreshAccount();
   redirect(error ? "/dashboard/profil?hinweis=fehler" : "/dashboard/profil?hinweis=gespeichert");
@@ -390,6 +390,8 @@ function refreshAccount(vehicleId?: string) {
   revalidatePath("/dashboard/vergleich");
   revalidatePath("/dashboard/profil");
   revalidatePath("/dashboard/inserate");
+  revalidatePath("/haendler");
+  revalidatePath("/haendler/[id]", "page");
   revalidatePath("/");
   revalidatePath("/suche");
   if (vehicleId) {

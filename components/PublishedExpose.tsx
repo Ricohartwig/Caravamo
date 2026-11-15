@@ -52,7 +52,9 @@ export function PublishedExpose({
         <SellerContact
           sellerName={listing.sellerName}
           sellerKind={listing.sellerKind}
-          sellerCity={listing.sellerCity}
+          sellerPlace={listing.sellerPlace}
+          sellerAbout={listing.sellerAbout}
+          sellerHref={listing.sellerHref}
           sellerId={listing.sellerId}
           vehicleId={listing.id}
           viewerId={viewerId}
