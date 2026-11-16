@@ -36,8 +36,11 @@ create table if not exists public.vehicle_images (
   vehicle_id uuid references public.vehicles (id) on delete cascade,
   url text,
   is_main boolean default false,
+  position integer not null default 0,
   created_at timestamptz default now()
 );
+
+alter table public.vehicle_images add column if not exists position integer not null default 0;
 
 alter table public.vehicles add column if not exists condition text;
 alter table public.vehicles add column if not exists price_tax text;

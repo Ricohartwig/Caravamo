@@ -7,7 +7,7 @@ import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
 import { getDealer, listDealerOffers } from "@/lib/dealers";
 import { listingDescription, listingTitle } from "@/lib/listing-seo";
 import { ownerSaveCount } from "@/lib/owned-listings";
-import { getPublishedListing } from "@/lib/published-listings";
+import { getPublishedListing, listSimilarOffers } from "@/lib/published-listings";
 import { createPublicClient } from "@/utils/supabase/public";
 
 const vehicleIdPattern =
@@ -80,11 +80,13 @@ async function VehicleExpose({
   }
 
   const returnTo = `/fahrzeug/${listing.id}`;
-  const [saved, savedCount, dealer, offers] = await Promise.all([
+  const body = typeof listing.values.body_type === "string" ? listing.values.body_type : null;
+  const [saved, savedCount, dealer, offers, similarOffers] = await Promise.all([
     viewer ? loadCardMarks(returnTo) : Promise.resolve(null),
     viewer && viewer.id === listing.sellerId ? ownerSaveCount(listing.id) : Promise.resolve(null),
     listing.sellerKind === "Händler" ? getDealer(listing.sellerId) : Promise.resolve(null),
     listDealerOffers(listing.sellerId),
+    listSimilarOffers(listing.id, body, listing.price),
   ]);
   const otherOffers = offers.filter((offer) => offer.id !== listing.id);
 
@@ -97,6 +99,7 @@ async function VehicleExpose({
         savedCount={savedCount}
         dealer={dealer}
         otherOffers={otherOffers}
+        similarOffers={similarOffers}
         library={saved}
         marks={{
           signedIn: Boolean(viewer),
