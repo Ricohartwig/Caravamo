@@ -43,6 +43,27 @@ export async function listNewestOffers(limit = 6): Promise<OfferCard[]> {
   return searchOffers(blankFilters(), limit);
 }
 
+export async function countPublicOffers(): Promise<number> {
+  if (!isSupabaseConfigured()) {
+    return 0;
+  }
+
+  await connection();
+  const now = new Date().toISOString();
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("vehicles")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "aktiv")
+    .or(`published_until.is.null,published_until.gt."${now}"`);
+
+  if (error || count === null) {
+    return 0;
+  }
+
+  return count;
+}
+
 export async function searchOffers(filters: VehicleFilters, limit = 48): Promise<OfferCard[]> {
   if (!isSupabaseConfigured()) {
     return [];

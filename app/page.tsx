@@ -4,8 +4,7 @@ import { Caravan, Store, Search } from "lucide-react";
 import { SearchBox } from "@/components/SearchBox";
 import { VehicleCard } from "@/components/VehicleCard";
 import { loadCardMarks, marksFor } from "@/lib/account";
-import { listingCategories } from "@/lib/listing-options";
-import { listNewestOffers } from "@/lib/published-listings";
+import { countPublicOffers, listNewestOffers } from "@/lib/published-listings";
 
 const steps = [
   {
@@ -29,7 +28,7 @@ export default function HomePage() {
   return (
     <>
       <section className="bg-gradient-to-br from-pine-deep via-[#1d4f44] to-[#a35a32] text-foam">
-        <div className="mx-auto max-w-6xl px-4 pb-16 pt-14 sm:pb-20 sm:pt-20">
+        <div className="mx-auto max-w-6xl px-4 pb-24 pt-14 sm:pb-28 sm:pt-20">
           <p className="text-sm font-medium tracking-wide text-foam/80">
             Marktplatz für Privat und Gewerbe
           </p>
@@ -40,29 +39,14 @@ export default function HomePage() {
             Wohnmobile, Wohnwagen, Dachzelte und Kabinen von Privat und Händlern.
             Die Suche führt direkt in die Angebote.
           </p>
-          <SearchBox />
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {listingCategories.map((type) => (
-              <li key={type}>
-                <Link
-                  href={`/suche?type=${encodeURIComponent(type)}`}
-                  className="inline-flex rounded-full border border-white/30 px-3 py-1.5 text-sm text-foam hover:bg-white/10"
-                >
-                  {type}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4">
-            <Link
-              href="/suche"
-              className="text-sm font-medium text-foam underline-offset-4 hover:underline"
-            >
-              Alle Angebote ansehen
-            </Link>
-          </p>
         </div>
       </section>
+
+      <div className="mx-auto -mt-16 max-w-6xl px-4">
+        <Suspense fallback={<SearchBox count={null} />}>
+          <HomeSearch />
+        </Suspense>
+      </div>
 
       <section className="mx-auto grid max-w-6xl gap-4 px-4 py-12 sm:grid-cols-3">
         {steps.map((step) => (
@@ -90,6 +74,11 @@ export default function HomePage() {
       </section>
     </>
   );
+}
+
+async function HomeSearch() {
+  const count = await countPublicOffers();
+  return <SearchBox count={count} />;
 }
 
 async function NewestListings() {

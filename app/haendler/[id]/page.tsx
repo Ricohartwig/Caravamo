@@ -4,10 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, Globe, Mail, MapPin, Phone } from "lucide-react";
+import { DealerMap } from "@/components/DealerMap";
 import { VehicleCard } from "@/components/VehicleCard";
 import { loadCardMarks, marksFor } from "@/lib/account";
 import { dealerJsonLd, getDealer, listDealerOffers, type PublicDealer } from "@/lib/dealers";
 import { formatDay, formatOfferCount } from "@/lib/format";
+import { postalPoint } from "@/lib/postal-areas";
 import { serializeJsonLd } from "@/lib/listing-seo";
 import { isVehicleId } from "@/lib/owned-listings";
 
@@ -131,7 +133,15 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
             )}
           </section>
         </div>
-        <aside className="h-fit rounded-2xl border border-line bg-card p-5">
+        <aside className="h-fit space-y-4">
+          {postalPoint(dealer.postalCode) ? (
+            <DealerMap
+              linked={false}
+              activeId={dealer.id}
+              pins={[{ id: dealer.id, label: dealer.companyName, postalCode: dealer.postalCode }]}
+            />
+          ) : null}
+          <div className="rounded-2xl border border-line bg-card p-5">
           <h2 className="text-lg font-semibold">Kontakt</h2>
           {address.length > 0 ? (
             <p className="mt-4 flex items-start gap-2 text-sm leading-6">
@@ -168,6 +178,7 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
             </p>
           ) : null}
           {dealer.vatId ? <p className="mt-4 text-sm text-muted">USt-IdNr. {dealer.vatId}</p> : null}
+          </div>
         </aside>
       </div>
     </article>
