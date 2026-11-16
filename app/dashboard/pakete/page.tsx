@@ -76,7 +76,7 @@ async function Packages({ searchParams }: { searchParams: Promise<{ abo?: string
               ? ` Die nächste Verlängerung ist am ${formatDay(subscription.currentPeriodEnd)}.`
               : ""}
           </p>
-          {subscription?.stripeCustomerId ? (
+          {subscription?.stripeCustomerId?.startsWith("cus_") ? (
             <form action={openBillingPortal} className="mt-4">
               <button
                 type="submit"
