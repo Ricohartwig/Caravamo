@@ -207,13 +207,18 @@ export async function duplicateListing(formData: FormData): Promise<void> {
     }
   }
 
-  const { data: images } = await owned.supabase.from("vehicle_images").select("url, is_main").eq("vehicle_id", id);
+  const { data: images } = await owned.supabase
+    .from("vehicle_images")
+    .select("url, is_main, position")
+    .eq("vehicle_id", id)
+    .order("position", { ascending: true });
   if (Array.isArray(images) && images.length > 0) {
-    const rows = images.flatMap((image) => {
+    const rows = images.flatMap((image, index) => {
       if (!image || typeof image.url !== "string" || image.url === "") {
         return [];
       }
-      return [{ vehicle_id: copy.id, url: image.url, is_main: image.is_main === true }];
+      const position = typeof image.position === "number" ? image.position : index;
+      return [{ vehicle_id: copy.id, url: image.url, is_main: index === 0, position }];
     });
     if (rows.length > 0) {
       const { error: imageError } = await owned.supabase.from("vehicle_images").insert(rows);
@@ -434,6 +439,7 @@ function imageRows(vehicleId: string, urls: string[]) {
     vehicle_id: vehicleId,
     url,
     is_main: index === 0,
+    position: index,
   }));
 }
 

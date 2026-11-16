@@ -4,6 +4,8 @@ import { blankFilters, camperFilterActive, standHeating, type VehicleFilters } f
 import { toilets } from "@/lib/listing-options";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
+import { type OfferSort, searchPageSize, similarPriceBand } from "@/lib/search-query";
+import { orderedImageUrls } from "@/lib/vehicle-images";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createPublicClient } from "@/utils/supabase/public";
 import { createClient } from "@/utils/supabase/server";
@@ -65,31 +67,108 @@ export async function countPublicOffers(): Promise<number> {
 }
 
 export async function searchOffers(filters: VehicleFilters, limit = 48): Promise<OfferCard[]> {
-  if (!isSupabaseConfigured()) {
+  const page = await searchOfferPage(filters, 1, "neueste", limit);
+  return page.offers;
+}
+
+export async function countOffers(filters: VehicleFilters): Promise<number> {
+  const page = await searchOfferPage(filters, 1, "neueste", 1);
+  return page.total;
+}
+
+export async function searchOfferPage(
+  filters: VehicleFilters,
+  page: number,
+  sort: OfferSort,
+  limit = searchPageSize,
+): Promise<{ offers: OfferCard[]; total: number }> {
+  const ready = await prepareSearch(filters);
+  if (!ready || ready.sellers?.length === 0) {
+    return { offers: [], total: 0 };
+  }
+
+  const from = Math.max(0, page - 1) * limit;
+  let query = ready.supabase
+    .from("vehicles")
+    .select(offerColumns(filters), { count: "exact" })
+    .eq("status", "aktiv")
+    .or(`published_until.is.null,published_until.gt."${ready.now}"`);
+  query = applyVehicleFilters(query, filters, ready.sellers);
+  query = applyCamperFilters(query, filters);
+  query = applySort(query, sort);
+
+  const { data, error, count } = await query.range(from, from + limit - 1);
+  if (error || !Array.isArray(data)) {
+    return { offers: [], total: 0 };
+  }
+
+  return {
+    offers: data.flatMap((row) => {
+      const card = toOfferCard(row);
+      return card ? [card] : [];
+    }),
+    total: count ?? 0,
+  };
+}
+
+export async function listSimilarOffers(id: string, body: string | null, price: number): Promise<OfferCard[]> {
+  if (!body || !isSupabaseConfigured() || !isVehicleId(id)) {
     return [];
   }
 
   await connection();
+  const band = similarPriceBand(price);
   const now = new Date().toISOString();
   const supabase = await createClient();
-  const sellers = await matchingSellerIds(supabase, filters);
-  if (sellers && sellers.length === 0) {
-    return [];
-  }
-
-  const details = camperFilterActive(filters)
-    ? "vehicle_camper_details!inner(body_type)"
-    : "vehicle_camper_details(body_type)";
-  let query = supabase
+  const { data, error } = await supabase
     .from("vehicles")
     .select(
-      `id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main), ${details}`,
+      "id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main, position), vehicle_camper_details!inner(body_type)",
     )
     .eq("status", "aktiv")
     .or(`published_until.is.null,published_until.gt."${now}"`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .eq("vehicle_camper_details.body_type", body)
+    .gte("price", band.min)
+    .lte("price", band.max)
+    .neq("id", id)
+    .limit(40);
 
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .flatMap((row) => {
+      const card = toOfferCard(row);
+      return card ? [card] : [];
+    })
+    .sort((left, right) => Math.abs(left.price - price) - Math.abs(right.price - price) || left.title.localeCompare(right.title, "de"))
+    .slice(0, 12);
+}
+
+async function prepareSearch(filters: VehicleFilters): Promise<{
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  now: string;
+  sellers: string[] | null;
+} | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
+  await connection();
+  const supabase = await createClient();
+  const sellers = await matchingSellerIds(supabase, filters);
+  return { supabase, now: new Date().toISOString(), sellers };
+}
+
+function offerColumns(filters: VehicleFilters): string {
+  const details = camperFilterActive(filters)
+    ? "vehicle_camper_details!inner(body_type)"
+    : "vehicle_camper_details(body_type)";
+  return `id, brand, model, type, price, mileage, year, first_registration, vehicle_images(url, is_main, position), ${details}`;
+}
+
+function applyVehicleFilters<T extends VehicleQuery<T>>(query: T, filters: VehicleFilters, sellers: string[] | null): T {
   if (filters.brand) {
     query = query.ilike("brand", escapeLike(filters.brand));
   }
@@ -123,17 +202,31 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
   if (sellers) {
     query = query.in("user_id", sellers);
   }
-  query = applyCamperFilters(query, filters);
 
-  const { data, error } = await query;
-  if (error || !Array.isArray(data)) {
-    return [];
+  return query;
+}
+
+function applySort<T extends SortQuery<T>>(query: T, sort: OfferSort): T {
+  if (sort === "preis-auf") {
+    return query.order("price", { ascending: true }).order("created_at", { ascending: false });
+  }
+  if (sort === "preis-ab") {
+    return query.order("price", { ascending: false }).order("created_at", { ascending: false });
+  }
+  if (sort === "km-auf") {
+    return query.order("mileage", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false });
+  }
+  if (sort === "km-ab") {
+    return query.order("mileage", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  }
+  if (sort === "ez-neu") {
+    return query.order("first_registration", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  }
+  if (sort === "ez-alt") {
+    return query.order("first_registration", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false });
   }
 
-  return data.flatMap((row) => {
-    const card = toOfferCard(row);
-    return card ? [card] : [];
-  });
+  return query.order("created_at", { ascending: false });
 }
 
 function applyCamperFilters<T extends CamperQuery<T>>(query: T, filters: VehicleFilters): T {
@@ -239,6 +332,18 @@ async function matchingSellerIds(
   });
 }
 
+type VehicleQuery<T> = {
+  ilike: (column: string, value: string) => T;
+  eq: (column: string, value: string | boolean) => T;
+  gte: (column: string, value: number) => T;
+  lte: (column: string, value: number) => T;
+  in: (column: string, value: readonly string[]) => T;
+};
+
+type SortQuery<T> = {
+  order: (column: string, options: { ascending: boolean; nullsFirst?: boolean }) => T;
+};
+
 type CamperQuery<T> = {
   eq: (column: string, value: string | boolean) => T;
   lte: (column: string, value: number) => T;
@@ -271,7 +376,7 @@ export async function listSitemapListings(): Promise<SitemapListing[]> {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("vehicles")
-      .select("id, created_at, vehicle_images(url, is_main)")
+      .select("id, created_at, vehicle_images(url, is_main, position)")
       .eq("status", "aktiv")
       .or(`published_until.is.null,published_until.gt."${now}"`)
       .order("created_at", { ascending: false })
@@ -289,7 +394,7 @@ export async function listSitemapListings(): Promise<SitemapListing[]> {
       listings.push({
         id: row.id,
         updatedAt: readString(row.created_at),
-        imageUrls: imageUrls(row.vehicle_images).filter((url) => url.startsWith("https://")),
+        imageUrls: orderedImageUrls(row.vehicle_images).filter((url) => url.startsWith("https://")),
       });
     }
 
@@ -311,7 +416,7 @@ export const getPublishedListing = cache(async (id: string): Promise<PublishedLi
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main)")
+    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main, position)")
     .eq("id", id)
     .maybeSingle();
 
@@ -334,7 +439,7 @@ export async function getOwnedPreview(userId: string, id: string): Promise<Publi
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main)")
+    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main, position)")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -365,7 +470,7 @@ async function toPublishedListing(id: string, data: Record<string, unknown>): Pr
     price,
     priceTax: readString(data.price_tax),
     description: readString(data.description),
-    imageUrls: imageUrls(data.vehicle_images),
+    imageUrls: orderedImageUrls(data.vehicle_images),
     sellerId: readString(data.user_id) ?? "",
     sellerName: seller.name,
     sellerKind: seller.kind,
@@ -429,7 +534,7 @@ function toOfferCard(row: unknown): OfferCard | null {
 
   const brand = readString(row.brand) ?? "Fahrzeug";
   const model = readString(row.model) ?? "";
-  const urls = imageUrls(row.vehicle_images);
+  const urls = orderedImageUrls(row.vehicle_images);
 
   return {
     id: row.id,
@@ -442,26 +547,6 @@ function toOfferCard(row: unknown): OfferCard | null {
     mileage: readNumber(row.mileage),
     imageUrl: urls[0] ?? null,
   };
-}
-
-function imageUrls(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const images = value.flatMap((entry) => {
-    if (!isRecord(entry)) {
-      return [];
-    }
-    const url = readString(entry.url);
-    if (!url) {
-      return [];
-    }
-    return [{ url, main: entry.is_main === true }];
-  });
-
-  images.sort((left, right) => Number(right.main) - Number(left.main));
-  return images.map((image) => image.url);
 }
 
 function registrationLabel(date: string | null, year: number | null): string {

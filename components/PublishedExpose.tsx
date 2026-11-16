@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SavedCount } from "@/components/account/SavedCount";
 import { DealerOnListing } from "@/components/DealerOnListing";
 import { ListingFacts } from "@/components/ListingFacts";
+import { ListingShare } from "@/components/ListingShare";
 import { OfferRail } from "@/components/OfferRail";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { SellerContact } from "@/components/SellerContact";
@@ -21,6 +22,7 @@ export function PublishedExpose({
   savedCount = null,
   dealer = null,
   otherOffers = [],
+  similarOffers = [],
   library = null,
 }: {
   listing: PublishedListing;
@@ -29,6 +31,7 @@ export function PublishedExpose({
   savedCount?: number | null;
   dealer?: PublicDealer | null;
   otherOffers?: OfferCard[];
+  similarOffers?: OfferCard[];
   library?: { signedIn: boolean; favorites: Set<string>; comparisons: Set<string>; returnTo: string } | null;
 }) {
   const price = listing.priceTax
@@ -52,6 +55,7 @@ export function PublishedExpose({
         {badge ? <p className="rounded-full bg-sand px-2.5 py-1 text-xs font-medium text-pine">{badge}</p> : null}
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight">{price}</p>
+      <ListingShare title={listing.title} path={`/fahrzeug/${listing.id}`} />
       {savedCount !== null ? (
         <div className="mt-3">
           <SavedCount count={savedCount} />
@@ -98,6 +102,22 @@ export function PublishedExpose({
           }
         >
           {otherOffers.map((offer) => (
+            <li key={offer.id} className="w-72 shrink-0 snap-start">
+              <VehicleCard
+                vehicle={offer}
+                marks={
+                  library
+                    ? marksFor(offer.id, library)
+                    : { signedIn: false, saved: false, compared: false, returnTo: `/fahrzeug/${listing.id}` }
+                }
+              />
+            </li>
+          ))}
+        </OfferRail>
+      ) : null}
+      {similarOffers.length > 0 ? (
+        <OfferRail id={`aehnlich-${listing.id}`} title="Ähnliche Fahrzeuge">
+          {similarOffers.map((offer) => (
             <li key={offer.id} className="w-72 shrink-0 snap-start">
               <VehicleCard
                 vehicle={offer}

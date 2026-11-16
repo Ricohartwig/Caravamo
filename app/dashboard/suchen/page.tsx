@@ -6,7 +6,7 @@ import { deleteSearch, openSavedSearch, renameSearch } from "@/actions/account";
 import { currentUser, listSavedSearches } from "@/lib/account";
 import { searchTitle } from "@/lib/filters";
 import { formatOfferCount } from "@/lib/format";
-import { searchOffers } from "@/lib/published-listings";
+import { countOffers } from "@/lib/published-listings";
 
 export const metadata: Metadata = {
   title: "Gespeicherte Suchen",
@@ -40,7 +40,7 @@ async function Searches({ searchParams }: { searchParams: Promise<{ hinweis?: st
   const params = await searchParams;
   const noticeKey = Array.isArray(params.hinweis) ? params.hinweis[0] : params.hinweis;
   const searches = await listSavedSearches(user.id);
-  const counts = await Promise.all(searches.map((search) => searchOffers(search.filters).then((offers) => offers.length)));
+  const counts = await Promise.all(searches.map((search) => countOffers(search.filters)));
 
   return (
     <div>

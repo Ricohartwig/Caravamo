@@ -113,7 +113,7 @@ export async function getOwnedDraft(userId: string, id: string): Promise<OwnedDr
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main)")
+    .select("*, vehicle_camper_details(*), vehicle_images(url, is_main, position)")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -177,21 +177,22 @@ async function listingSignals(
   return signals;
 }
 
-function imageEntries(value: unknown): { url: string; main: boolean }[] {
+function imageEntries(value: unknown): { url: string; main: boolean; position: number }[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  const images = value.flatMap((entry) => {
+  const images = value.flatMap((entry, index) => {
     if (!isRecord(entry)) {
       return [];
     }
 
     const url = readString(entry.url);
-    return url ? [{ url, main: entry.is_main === true }] : [];
+    const position = readNumber(entry.position);
+    return url ? [{ url, main: entry.is_main === true, position: position ?? index }] : [];
   });
 
-  images.sort((left, right) => Number(right.main) - Number(left.main));
+  images.sort((left, right) => left.position - right.position || Number(right.main) - Number(left.main));
   return images;
 }
 

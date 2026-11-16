@@ -1,5 +1,29 @@
 import { getSupabaseEnv } from "@/utils/supabase/env";
 
+export function orderedImageUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const images = value.flatMap((entry, index) => {
+    if (typeof entry !== "object" || entry === null) {
+      return [];
+    }
+
+    const record = entry as { url?: unknown; is_main?: unknown; position?: unknown };
+    const url = typeof record.url === "string" ? record.url.trim() : "";
+    if (!url) {
+      return [];
+    }
+
+    const position = typeof record.position === "number" && Number.isFinite(record.position) ? record.position : index;
+    return [{ url, main: record.is_main === true, position }];
+  });
+
+  images.sort((left, right) => left.position - right.position || Number(right.main) - Number(left.main));
+  return images.map((image) => image.url);
+}
+
 const publicMarker = "/storage/v1/object/public/vehicle-images/";
 
 export function publicImageUrl(path: string, userId: string): string | null {

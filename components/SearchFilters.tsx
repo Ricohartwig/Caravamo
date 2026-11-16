@@ -193,10 +193,12 @@ const filterScript = `
 export function SearchShell({
   filters,
   startOpen,
+  sort = "neueste",
   children,
 }: {
   filters: VehicleFilters;
   startOpen: boolean;
+  sort?: string;
   children: ReactNode;
 }) {
   const extra = advancedCount(filters);
@@ -226,6 +228,7 @@ export function SearchShell({
           className="search-form mb-6 grid gap-3 rounded-2xl border border-line bg-card p-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           <input type="hidden" name="erweitert" value="0" />
+          <input type="hidden" name="sort" value={sort} />
           <div className="search-open-only shrink-0 items-center justify-between gap-3">
             <h2 className="text-base font-semibold">Filter</h2>
             <label

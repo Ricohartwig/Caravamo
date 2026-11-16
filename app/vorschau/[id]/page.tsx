@@ -8,7 +8,7 @@ import { getDealer, listDealerOffers } from "@/lib/dealers";
 import { formatDay } from "@/lib/format";
 import { listingStand, paidTimeLeft } from "@/lib/listing-state";
 import { isVehicleId, ownerSaveCount } from "@/lib/owned-listings";
-import { getOwnedPreview } from "@/lib/published-listings";
+import { getOwnedPreview, listSimilarOffers } from "@/lib/published-listings";
 
 export const instant = false;
 
@@ -52,11 +52,13 @@ export default async function PreviewPage({
   const publishedUntil = typeof listing.values.published_until === "string" ? listing.values.published_until : null;
   const stand = listingStand(status, publishedUntil);
   const returnTo = `/vorschau/${id}`;
-  const [saved, savedCount, dealer, offers] = await Promise.all([
+  const body = typeof listing.values.body_type === "string" ? listing.values.body_type : null;
+  const [saved, savedCount, dealer, offers, similarOffers] = await Promise.all([
     loadCardMarks(returnTo),
     ownerSaveCount(id),
     listing.sellerKind === "Händler" ? getDealer(listing.sellerId) : Promise.resolve(null),
     listDealerOffers(listing.sellerId),
+    listSimilarOffers(id, body, listing.price),
   ]);
   const otherOffers = offers.filter((offer) => offer.id !== id);
 
@@ -104,6 +106,7 @@ export default async function PreviewPage({
         savedCount={savedCount}
         dealer={dealer}
         otherOffers={otherOffers}
+        similarOffers={similarOffers}
         library={saved}
         marks={{
           signedIn: true,

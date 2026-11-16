@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ImagePlus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 const maxImages = 12;
@@ -74,7 +74,7 @@ export function ImageUpload({ images, onChange, onPendingChange }: ImageUploadPr
     <fieldset className="rounded-2xl border border-line bg-card p-4 sm:p-5">
       <legend className="px-1 text-base font-semibold">Bilder</legend>
       <p className="mt-2 text-sm leading-6 text-muted">
-        JPG, PNG oder WebP, höchstens 10 MB pro Bild. Das erste Bild wird das Hauptbild.
+        JPG, PNG oder WebP, höchstens 10 MB pro Bild. Ziehe die Bilder in die gewünschte Reihenfolge. Das erste Bild ist das Hauptbild.
       </p>
       <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-foam px-4 py-8 text-center hover:bg-sand">
         <ImagePlus aria-hidden="true" className="size-6 text-pine" />
@@ -104,33 +104,102 @@ export function ImageUpload({ images, onChange, onPendingChange }: ImageUploadPr
       {images.length > 0 ? (
         <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {images.map((image, index) => (
-            <li key={image.path} className="relative aspect-[16/10] overflow-hidden rounded-xl">
-              <Image
-                src={image.previewUrl}
-                alt={index === 0 ? "Hauptbild" : `Bild ${index + 1}`}
-                fill
-                sizes="(min-width: 640px) 30vw, 50vw"
-                className="object-cover"
-              />
-              {index === 0 ? (
-                <p className="absolute left-2 top-2 rounded-full bg-pine-deep/70 px-2 py-1 text-xs font-medium text-foam">
-                  Hauptbild
-                </p>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => void removeImage(image)}
-                className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full bg-foam text-ink"
-                aria-label={index === 0 ? "Hauptbild entfernen" : `Bild ${index + 1} entfernen`}
-              >
-                <X aria-hidden="true" className="size-4" />
-              </button>
+            <li
+              key={image.path}
+              draggable
+              data-image-index={index}
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", String(index));
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const from = Number(event.dataTransfer.getData("text/plain"));
+                if (!Number.isInteger(from) || from === index) {
+                  return;
+                }
+                onChange(moveItem(images, from, index));
+              }}
+              className="overflow-hidden rounded-xl border border-line bg-foam"
+            >
+              <div className="relative aspect-[16/10]">
+                <Image
+                  src={image.previewUrl}
+                  alt={index === 0 ? "Hauptbild" : `Bild ${index + 1}`}
+                  fill
+                  draggable={false}
+                  sizes="(min-width: 640px) 30vw, 50vw"
+                  className="object-cover"
+                />
+                {index === 0 ? (
+                  <p className="absolute left-2 top-2 rounded-full bg-pine-deep/70 px-2 py-1 text-xs font-medium text-foam">
+                    Hauptbild
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onChange(moveItem(images, index, 0))}
+                    className="absolute left-2 top-2 rounded-full bg-foam/95 px-2 py-1 text-xs font-semibold text-ink"
+                  >
+                    Als Hauptbild
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void removeImage(image)}
+                  className="absolute right-2 top-2 inline-flex size-8 items-center justify-center rounded-full bg-foam text-ink"
+                  aria-label={index === 0 ? "Hauptbild entfernen" : `Bild ${index + 1} entfernen`}
+                >
+                  <X aria-hidden="true" className="size-4" />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                <p className="text-xs text-muted">Ziehen</p>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => onChange(moveItem(images, index, index - 1))}
+                    className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-sand disabled:opacity-40"
+                    aria-label={`Bild ${index + 1} nach vorn`}
+                  >
+                    <ChevronLeft aria-hidden="true" className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === images.length - 1}
+                    onClick={() => onChange(moveItem(images, index, index + 1))}
+                    className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-sand disabled:opacity-40"
+                    aria-label={`Bild ${index + 1} nach hinten`}
+                  >
+                    <ChevronRight aria-hidden="true" className="size-4" />
+                  </button>
+                </div>
+              </div>
             </li>
           ))}
         </ul>
       ) : null}
     </fieldset>
   );
+}
+
+function moveItem<T>(items: readonly T[], from: number, to: number): T[] {
+  if (from < 0 || to < 0 || from >= items.length || to >= items.length || from === to) {
+    return [...items];
+  }
+
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  if (item === undefined) {
+    return [...items];
+  }
+  next.splice(to, 0, item);
+  return next;
 }
 
 async function uploadVehicleImage(file: File): Promise<UploadedImage> {

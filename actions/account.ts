@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { accountProfile, currentUser, searchLimit } from "@/lib/account";
 import { mailInquiry } from "@/lib/inquiry-mail";
 import { parseFilters, parseStoredFilters, searchHref, searchTitle } from "@/lib/filters";
+import { countOffers } from "@/lib/published-listings";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
 import { parseProfile, profileRow } from "@/lib/profile";
-import { searchOffers } from "@/lib/published-listings";
 import { safeNextPath } from "@/lib/auth-redirect";
 import { createClient } from "@/utils/supabase/server";
 
@@ -125,12 +125,12 @@ export async function saveSearch(formData: FormData): Promise<void> {
     redirect("/dashboard/suchen?hinweis=voll");
   }
 
-  const matches = await searchOffers(filters);
+  const matches = await countOffers(filters);
   const { error } = await supabase.from("saved_searches").insert({
     user_id: user.id,
     name,
     filters,
-    last_count: matches.length,
+    last_count: matches,
   });
   if (error) {
     redirect("/dashboard/suchen?hinweis=fehler");
@@ -173,8 +173,8 @@ export async function openSavedSearch(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { data } = await supabase.from("saved_searches").select("filters").eq("id", id).eq("user_id", user.id).maybeSingle();
   const filters = parseStoredFilters(data?.filters);
-  const matches = await searchOffers(filters);
-  await supabase.from("saved_searches").update({ last_count: matches.length }).eq("id", id).eq("user_id", user.id);
+  const matches = await countOffers(filters);
+  await supabase.from("saved_searches").update({ last_count: matches }).eq("id", id).eq("user_id", user.id);
   refreshAccount();
   redirect(searchHref(filters));
 }
