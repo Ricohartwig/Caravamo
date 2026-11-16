@@ -102,24 +102,13 @@ export async function toggleComparison(formData: FormData): Promise<void> {
 
 export async function saveSearch(formData: FormData): Promise<void> {
   const user = await currentUser();
-  const filters = parseFilters({
-    brand: String(formData.get("brand") ?? ""),
-    model: String(formData.get("model") ?? ""),
-    type: String(formData.get("type") ?? ""),
-    body: String(formData.get("body") ?? ""),
-    price_min: String(formData.get("price_min") ?? ""),
-    price_max: String(formData.get("price_max") ?? ""),
-    weight_max: String(formData.get("weight_max") ?? ""),
-    solar: String(formData.get("solar") ?? ""),
-    inverter: String(formData.get("inverter") ?? ""),
-    awning: String(formData.get("awning") ?? ""),
-    air: String(formData.get("air") ?? ""),
-    fuel: String(formData.get("fuel") ?? ""),
-    transmission: String(formData.get("transmission") ?? ""),
-    bed: String(formData.get("bed") ?? ""),
-    climate: String(formData.get("climate") ?? ""),
-    sleep_min: String(formData.get("sleep_min") ?? ""),
-  });
+  const bag: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key !== "name" && typeof value === "string") {
+      bag[key] = value;
+    }
+  }
+  const filters = parseFilters(bag);
   const returnTo = searchHref(filters);
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(returnTo)}`);

@@ -1,262 +1,578 @@
-import Link from "next/link";
+import type { ReactNode } from "react";
+import { SlidersHorizontal, X } from "lucide-react";
 import {
   bedTypes,
   bodyTypes,
+  conditions,
   fuels,
   listingCategories,
   transmissions,
+  type ListingCategory,
 } from "@/lib/listing-options";
-import { selectedCategory, weightLimitKg, weightSliderMaxKg, type VehicleFilters } from "@/lib/filters";
+import { bodyOptions } from "@/lib/listing-sections";
+import {
+  filterLabels,
+  weightLimitKg,
+  weightSliderMaxKg,
+  type VehicleFilters,
+} from "@/lib/filters";
 
 const fieldClassName =
   "mt-1.5 w-full rounded-xl border border-line bg-foam px-3 py-3 text-base text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
 
 const weightSliderMinKg = 750;
 
-const filterControls = `
-(() => {
-  const form = document.querySelector('form[aria-label="Filter"]');
-  if (!form) return;
-  const weight = form.querySelector("#filter-weight");
-  const label = form.querySelector("[data-weight-label]");
-  const preset = form.querySelector("[data-weight-preset]");
-  const max = ${weightSliderMaxKg};
-  const limit = ${weightLimitKg};
-  const format = (value) => new Intl.NumberFormat("de-DE").format(value);
-  const text = (value) =>
-    value >= max ? "alle Gewichte" : value === limit ? format(value) + " kg, Führerschein B" : format(value) + " kg";
-  const paint = () => {
-    if (!(weight instanceof HTMLInputElement) || !label) return;
-    const value = Number(weight.value);
-    const next = text(value);
-    label.textContent = next;
+const layoutStyle = `
+.search-open-only {
+  display: none;
+}
+.search-pair,
+.search-scroll {
+  display: contents;
+}
+.search-advanced {
+  display: none;
+}
+#filter-expand:focus-visible ~ .search-layout [data-expand-toggle] {
+  outline: 2px solid var(--color-pine);
+  outline-offset: 2px;
+}
+#filter-expand:checked ~ .search-layout .search-open-only {
+  display: flex;
+}
+#filter-expand:checked ~ .search-layout .search-advanced {
+  display: block;
+}
+#filter-expand:checked ~ .search-layout .search-closed-only {
+  display: none;
+}
+#filter-expand:checked ~ .search-layout .search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 0;
+  overflow: hidden;
+}
+#filter-expand:checked ~ .search-layout .search-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+#filter-expand:checked ~ .search-layout .search-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+#filter-expand:checked ~ .search-layout:has([name="type"] option[value="Wohnwagen"]:checked) .search-motor,
+#filter-expand:checked ~ .search-layout:has([name="type"] option[value="Dachzelt/Faltanhänger"]:checked) .search-motor,
+#filter-expand:checked ~ .search-layout:has([name="type"] option[value="Kabine"]:checked) .search-motor,
+#filter-expand:checked ~ .search-layout:has([name="type"] option[value="Dachzelt/Faltanhänger"]:checked) .search-living,
+#filter-expand:checked ~ .search-layout:has([name="type"] option[value="Dachzelt/Faltanhänger"]:checked) .search-exterior {
+  display: none;
+}
+@media (min-width: 1024px) {
+  #filter-expand:checked ~ .search-layout {
+    display: grid;
+    grid-template-columns: 22rem minmax(0, 1fr);
+    align-items: start;
+    column-gap: 1.5rem;
+  }
+  #filter-expand:checked ~ .search-layout .search-form {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100vh - 16rem);
+    border-radius: 1rem;
+  }
+}
+@media (max-width: 1023px) {
+  #filter-expand:checked ~ .search-backdrop {
+    display: block;
+  }
+  #filter-expand:checked ~ .search-layout .search-form {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 60;
+    width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+`;
+
+const filterScript = `
+(function () {
+  var form = document.getElementById("search-filters");
+  var expand = document.getElementById("filter-expand");
+  if (!form || !expand || form.getAttribute("data-ready") === "1") return;
+  form.setAttribute("data-ready", "1");
+  var weight = document.getElementById("filter-weight");
+  var label = document.getElementById("filter-weight-label");
+  var preset = document.getElementById("filter-weight-preset");
+  var max = ${weightSliderMaxKg};
+  var limit = ${weightLimitKg};
+  function text(value) {
+    if (value >= max) return "alle Gewichte";
+    var formatted = value.toLocaleString("de-DE");
+    return value === limit ? formatted + " kg, Führerschein B" : formatted + " kg";
+  }
+  function paint() {
+    if (!weight || !label) return;
+    var value = Number(weight.value);
+    var current = text(value);
+    label.textContent = current;
     weight.setAttribute("aria-valuenow", String(value));
-    weight.setAttribute("aria-valuetext", next);
+    weight.setAttribute("aria-valuetext", current);
     if (preset) preset.setAttribute("aria-pressed", value === limit ? "true" : "false");
-  };
-  weight?.addEventListener("input", paint);
-  preset?.addEventListener("click", () => {
-    if (weight instanceof HTMLInputElement) weight.value = String(limit);
-    paint();
-  });
-  form.addEventListener("submit", () => {
-    const type = form.querySelector("#filter-type");
-    const motorhome = type instanceof HTMLSelectElement && type.value === "Wohnmobil";
-    for (const field of form.elements) {
-      if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement) || !field.name) continue;
-      const camperField = Boolean(field.closest("fieldset"));
-      const unlimited = field.name === "weight_max" && Number(field.value) >= max;
-      if ((camperField && !motorhome) || unlimited || field.value === "") field.disabled = true;
+  }
+  function mark() {
+    var open = expand.checked ? "true" : "false";
+    var toggles = form.querySelectorAll("[data-expand-toggle]");
+    for (var i = 0; i < toggles.length; i++) toggles[i].setAttribute("aria-expanded", open);
+  }
+  if (weight) weight.addEventListener("input", paint);
+  if (preset && weight) {
+    preset.addEventListener("click", function () {
+      weight.value = String(limit);
+      paint();
+    });
+  }
+  expand.addEventListener("change", mark);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && expand.checked) {
+      expand.checked = false;
+      expand.dispatchEvent(new Event("change", { bubbles: true }));
     }
   });
+  form.addEventListener("submit", function () {
+    var hidden = form.querySelector('input[type="hidden"][name="erweitert"]');
+    if (expand.checked && hidden) hidden.disabled = true;
+    var fields = form.elements;
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (!field.name || field.type === "hidden" || field.type === "submit" || field.type === "button") continue;
+      if (field === expand) continue;
+      var unlimited = field.name === "weight_max" && Number(field.value) >= max;
+      if (unlimited || field.value === "") field.disabled = true;
+    }
+  });
+  mark();
 })();
 `;
 
-type SearchFiltersProps = {
+export function SearchShell({
+  filters,
+  startOpen,
+  children,
+}: {
   filters: VehicleFilters;
-};
-
-export function SearchFilters({ filters }: SearchFiltersProps) {
-  const initialCategory = selectedCategory(filters);
+  startOpen: boolean;
+  children: ReactNode;
+}) {
+  const extra = advancedCount(filters);
 
   return (
-    <aside className="w-full shrink-0 lg:w-72">
-      <form action="/suche" method="get" aria-label="Filter" className="group rounded-2xl border border-line bg-card p-4">
-        <h2 className="text-base font-semibold">Filter</h2>
-
-        <label htmlFor="filter-brand" className="mt-4 block text-sm font-medium">
-          Marke
-          <input id="filter-brand" name="brand" defaultValue={filters.brand} className={fieldClassName} />
-        </label>
-
-        <label htmlFor="filter-model" className="mt-4 block text-sm font-medium">
-          Modell
-          <input id="filter-model" name="model" defaultValue={filters.model} className={fieldClassName} />
-        </label>
-
-        <label htmlFor="filter-type" className="mt-4 block text-sm font-medium">
-          Fahrzeugart
-          <select id="filter-type" name="type" defaultValue={initialCategory} className={fieldClassName}>
-            <option value="">Alle Fahrzeugarten</option>
-            {listingCategories.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="hidden group-has-[option[value=Wohnmobil]:checked]:block">
-          <MotorhomeFilters filters={filters} />
-        </div>
-
-        <label htmlFor="filter-price-min" className="mt-4 block text-sm font-medium">
-          Preis von
-          <input
-            id="filter-price-min"
-            name="price_min"
-            inputMode="numeric"
-            defaultValue={filters.priceMin ?? ""}
-            className={fieldClassName}
-          />
-        </label>
-
-        <label htmlFor="filter-price-max" className="mt-4 block text-sm font-medium">
-          Preis bis
-          <input
-            id="filter-price-max"
-            name="price_max"
-            inputMode="numeric"
-            defaultValue={filters.priceMax ?? ""}
-            className={fieldClassName}
-          />
-        </label>
-
-        <button
-          type="submit"
-          className="mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
+    <div className="mt-6">
+      <style>{layoutStyle}</style>
+      <input
+        id="filter-expand"
+        name="erweitert"
+        type="checkbox"
+        value="1"
+        form="search-filters"
+        defaultChecked={startOpen}
+        className="sr-only"
+        aria-label="Weitere Filter"
+      />
+      <label htmlFor="filter-expand" className="search-backdrop fixed inset-0 z-50 hidden bg-ink/40">
+        <span className="sr-only">Filter schließen</span>
+      </label>
+      <div className="search-layout">
+        <form
+          id="search-filters"
+          action="/suche"
+          method="get"
+          aria-label="Filter"
+          className="search-form mb-6 grid gap-3 rounded-2xl border border-line bg-card p-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          Filter anwenden
-        </button>
-        <Link
-          href="/suche"
-          className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-muted hover:text-foreground"
-        >
-          Zurücksetzen
-        </Link>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: filterControls }} />
-    </aside>
+          <input type="hidden" name="erweitert" value="0" />
+          <div className="search-open-only shrink-0 items-center justify-between gap-3">
+            <h2 className="text-base font-semibold">Filter</h2>
+            <label
+              htmlFor="filter-expand"
+              data-expand-toggle=""
+              className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl px-2 text-sm font-semibold hover:bg-sand"
+            >
+              <X aria-hidden="true" className="size-4" />
+              Einklappen
+            </label>
+          </div>
+          <div className="search-scroll">
+          <CategoryField value={filters.type} />
+          <TextField id="filter-brand" name="brand" label="Marke" defaultValue={filters.brand} />
+          <TextField id="filter-model" name="model" label="Modell" defaultValue={filters.model} />
+          <div className="search-pair">
+            <TextField id="filter-price-min" name="price_min" label="Preis von" defaultValue={filters.priceMin ?? ""} numeric />
+            <TextField id="filter-price-max" name="price_max" label="Preis bis" defaultValue={filters.priceMax ?? ""} numeric />
+          </div>
+
+          <div className="search-advanced">
+            <SelectField id="filter-condition" name="condition" label="Fahrzeugzustand" defaultValue={filters.condition}>
+              <option value="">Beliebig</option>
+              {conditions.map((condition) => (
+                <option key={condition} value={condition}>
+                  {condition}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+
+          <div className="search-advanced search-pair">
+            <TextField id="filter-year-min" name="year_min" label="Erstzulassung von" defaultValue={filters.yearMin ?? ""} numeric />
+            <TextField id="filter-year-max" name="year_max" label="Erstzulassung bis" defaultValue={filters.yearMax ?? ""} numeric />
+          </div>
+
+          <div className="search-advanced search-motor">
+            <div className="grid grid-cols-2 gap-3">
+              <TextField id="filter-km-min" name="mileage_min" label="Kilometer von" defaultValue={filters.mileageMin ?? ""} numeric />
+              <TextField id="filter-km-max" name="mileage_max" label="Kilometer bis" defaultValue={filters.mileageMax ?? ""} numeric />
+            </div>
+          </div>
+
+          <div className="search-advanced">
+            <TextField id="filter-city" name="city" label="Ort oder PLZ" defaultValue={filters.city} />
+            <fieldset className="mt-4">
+              <legend className="text-sm font-medium">Anbieter</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Radio name="seller" value="" label="Alle" defaultChecked={filters.seller === ""} />
+                <Radio name="seller" value="haendler" label="Händler" defaultChecked={filters.seller === "haendler"} />
+                <Radio name="seller" value="privat" label="Privat" defaultChecked={filters.seller === "privat"} />
+              </div>
+            </fieldset>
+            <BodyField type={filters.type} body={filters.body} />
+          </div>
+
+          <div className="search-advanced search-pair">
+            <TextField id="filter-length-min" name="length_min" label="Länge von, cm" defaultValue={filters.lengthMin ?? ""} numeric />
+            <TextField id="filter-length-max" name="length_max" label="Länge bis, cm" defaultValue={filters.lengthMax ?? ""} numeric />
+          </div>
+
+          <div className="search-advanced">
+            <WeightField value={filters.weightMax} />
+          </div>
+
+          <div className="search-advanced search-motor space-y-4">
+            <SelectField id="filter-fuel" name="fuel" label="Kraftstoff" defaultValue={filters.fuel}>
+              <option value="">Alle Kraftstoffe</option>
+              {fuels.map((fuel) => (
+                <option key={fuel} value={fuel}>
+                  {fuel}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField id="filter-transmission" name="transmission" label="Getriebe" defaultValue={filters.transmission}>
+              <option value="">Alle Getriebe</option>
+              {transmissions.map((transmission) => (
+                <option key={transmission} value={transmission}>
+                  {transmission}
+                </option>
+              ))}
+            </SelectField>
+            <TextField id="filter-power" name="power_min" label="Leistung ab PS" defaultValue={filters.powerMin ?? ""} numeric />
+          </div>
+
+          <div className="search-advanced search-living space-y-4">
+            <SelectField id="filter-sleep" name="sleep_min" label="Schlafplätze ab" defaultValue={filters.sleepMin ?? ""}>
+              <option value="">Egal</option>
+              {[2, 3, 4, 5, 6].map((places) => (
+                <option key={places} value={places}>
+                  {places}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField id="filter-bed" name="bed" label="Bettentyp" defaultValue={filters.bed}>
+              <option value="">Alle Betten</option>
+              {bedTypes.map((bed) => (
+                <option key={bed} value={bed}>
+                  {bed}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+
+          <fieldset className="search-advanced border-t border-line pt-4">
+            <legend className="text-sm font-semibold">Ausstattung</legend>
+            <div className="mt-3 space-y-2">
+              <Check name="solar" label="Solaranlage" defaultChecked={filters.solar} />
+              <Check name="inverter" label="Wechselrichter" defaultChecked={filters.inverter} />
+              <Check name="bike" label="Fahrradträger" defaultChecked={filters.bike} />
+              <Check name="hitch" label="Anhängerkupplung" defaultChecked={filters.hitch} />
+              <div className="search-exterior space-y-2">
+                <Check name="awning" label="Markise" defaultChecked={filters.awning} />
+                <Check name="air" label="Luftfederung" defaultChecked={filters.air} />
+              </div>
+              <div className="search-living space-y-2">
+                <Check name="climate" label="Dachklimaanlage" value="Dachklimaanlage" defaultChecked={filters.climate === "Dachklimaanlage"} />
+                <Check name="heater" label="Standheizung" defaultChecked={filters.heater} />
+                <Check name="shower" label="separate Dusche" defaultChecked={filters.shower} />
+                <Check name="toilet" label="WC" defaultChecked={filters.toilet} />
+                <Check name="seating" label="Rundsitzgruppe" defaultChecked={filters.seating} />
+              </div>
+              <Check name="sat" label="SAT-TV" defaultChecked={filters.sat} />
+            </div>
+          </fieldset>
+
+          <div className="search-closed-only flex flex-col gap-2 sm:flex-row lg:flex-col">
+            <button
+              type="submit"
+              className="inline-flex h-12 flex-1 items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
+            >
+              Suchen
+            </button>
+            <label
+              htmlFor="filter-expand"
+              data-expand-toggle=""
+              className="inline-flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold hover:bg-sand"
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+              Weitere Filter
+              {extra > 0 ? <span className="text-muted">{extra}</span> : null}
+            </label>
+          </div>
+          </div>
+
+          <div className="search-open-only mt-1 shrink-0 flex-col border-t border-line pt-3">
+            <button
+              type="submit"
+              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
+            >
+              Treffer zeigen
+            </button>
+            <a
+              href="/suche"
+              className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl text-sm font-medium text-muted hover:text-foreground"
+            >
+              Zurücksetzen
+            </a>
+          </div>
+        </form>
+        <div className="min-w-0">{children}</div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: filterScript }} />
+    </div>
   );
 }
 
-function MotorhomeFilters({ filters }: { filters: VehicleFilters }) {
-  const weight = filters.weightMax ?? weightSliderMaxKg;
-  const label = weightText(weight);
+function CategoryField({ value }: { value: string }) {
+  return (
+    <label htmlFor="filter-type" className="block text-sm font-medium">
+      Fahrzeugart
+      <select id="filter-type" name="type" defaultValue={value} className={fieldClassName}>
+        <option value="">Alle Fahrzeugarten</option>
+        {listingCategories.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function BodyField({ type, body }: { type: string; body: string }) {
+  const grouped = !isCategory(type);
 
   return (
-    <fieldset className="mt-4 space-y-4 border-t border-line pt-4">
-      <legend className="text-sm font-semibold">Wohnmobil</legend>
+    <label htmlFor="filter-body" className="mt-4 block text-sm font-medium">
+      Aufbauart
+      <select id="filter-body" name="body" defaultValue={body} className={fieldClassName}>
+        <option value="">Alle Aufbauarten</option>
+        {grouped
+          ? listingCategories.map((category) => (
+              <optgroup key={category} label={category}>
+                {bodyTypes[category].map((entry) => (
+                  <option key={entry} value={entry}>
+                    {entry}
+                  </option>
+                ))}
+              </optgroup>
+            ))
+          : bodyOptions(type).map((entry) => (
+              <option key={entry} value={entry}>
+                {entry}
+              </option>
+            ))}
+      </select>
+    </label>
+  );
+}
 
-      <label htmlFor="filter-body" className="block text-sm font-medium">
-        Aufbauart
-        <select id="filter-body" name="body" defaultValue={filters.body} className={fieldClassName}>
-          <option value="">Alle Aufbauarten</option>
-          {bodyTypes.Wohnmobil.map((body) => (
-            <option key={body} value={body}>
-              {body}
-            </option>
-          ))}
-        </select>
-      </label>
+function TextField({
+  id,
+  name,
+  label,
+  defaultValue,
+  numeric = false,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue: string | number;
+  numeric?: boolean;
+}) {
+  return (
+    <label htmlFor={id} className="block text-sm font-medium">
+      {label}
+      <input
+        id={id}
+        name={name}
+        inputMode={numeric ? "numeric" : undefined}
+        defaultValue={defaultValue}
+        className={fieldClassName}
+      />
+    </label>
+  );
+}
 
-      <div>
-        <label htmlFor="filter-weight" className="block text-sm font-medium">
-          Gewicht bis
-          <span data-weight-label className="mt-1 block text-sm font-normal text-muted">
-            {label}
-          </span>
-          <input
-            id="filter-weight"
-            type="range"
-            min={weightSliderMinKg}
-            max={weightSliderMaxKg}
-            step={50}
-            defaultValue={weight}
-            aria-valuemin={weightSliderMinKg}
-            aria-valuemax={weightSliderMaxKg}
-            aria-valuenow={weight}
-            aria-valuetext={label}
-            name="weight_max"
-            className="mt-3 w-full accent-pine"
-          />
-        </label>
-        <button
-          type="button"
-          data-weight-preset={weightLimitKg}
-          aria-pressed={weight === weightLimitKg}
-          className="mt-2 inline-flex h-9 items-center rounded-full border border-line px-3 text-sm font-medium hover:bg-sand aria-pressed:border-pine aria-pressed:bg-sand"
-        >
-          bis 3.500 kg
-        </button>
-      </div>
-
-      <div className="space-y-2">
-        <Check name="solar" label="Solaranlage" checked={filters.solar} />
-        <Check name="inverter" label="Wechselrichter" checked={filters.inverter} />
-        <Check name="awning" label="Markise" checked={filters.awning} />
-        <Check name="air" label="Luftfederung" checked={filters.air} />
-        <Check name="climate" label="Dachklimaanlage" value="Dachklimaanlage" checked={filters.climate === "Dachklimaanlage"} />
-      </div>
-
-      <label htmlFor="filter-fuel" className="block text-sm font-medium">
-        Kraftstoff
-        <select id="filter-fuel" name="fuel" defaultValue={filters.fuel} className={fieldClassName}>
-          <option value="">Alle Kraftstoffe</option>
-          {fuels.map((fuel) => (
-            <option key={fuel} value={fuel}>
-              {fuel}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label htmlFor="filter-transmission" className="block text-sm font-medium">
-        Getriebe
-        <select id="filter-transmission" name="transmission" defaultValue={filters.transmission} className={fieldClassName}>
-          <option value="">Alle Getriebe</option>
-          {transmissions.map((transmission) => (
-            <option key={transmission} value={transmission}>
-              {transmission}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label htmlFor="filter-bed" className="block text-sm font-medium">
-        Bettentyp
-        <select id="filter-bed" name="bed" defaultValue={filters.bed} className={fieldClassName}>
-          <option value="">Alle Betten</option>
-          {bedTypes.map((bed) => (
-            <option key={bed} value={bed}>
-              {bed}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label htmlFor="filter-sleep" className="block text-sm font-medium">
-        Schlafplätze ab
-        <select id="filter-sleep" name="sleep_min" defaultValue={filters.sleepMin ?? ""} className={fieldClassName}>
-          <option value="">Egal</option>
-          {[2, 3, 4, 5, 6].map((places) => (
-            <option key={places} value={places}>
-              {places}
-            </option>
-          ))}
-        </select>
-      </label>
-    </fieldset>
+function SelectField({
+  id,
+  name,
+  label,
+  defaultValue,
+  children,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue: string | number;
+  children: ReactNode;
+}) {
+  return (
+    <label htmlFor={id} className="block text-sm font-medium">
+      {label}
+      <select id={id} name={name} defaultValue={defaultValue} className={fieldClassName}>
+        {children}
+      </select>
+    </label>
   );
 }
 
 function Check({
   name,
   label,
-  checked,
+  defaultChecked,
   value = "1",
 }: {
   name: string;
   label: string;
-  checked: boolean;
+  defaultChecked: boolean;
   value?: string;
 }) {
   return (
     <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" name={name} value={value} defaultChecked={checked} className="size-4 accent-pine" />
+      <input type="checkbox" name={name} value={value} defaultChecked={defaultChecked} className="size-4 accent-pine" />
       {label}
     </label>
   );
+}
+
+function Radio({
+  name,
+  value,
+  label,
+  defaultChecked,
+}: {
+  name: string;
+  value: string;
+  label: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm has-[:checked]:border-pine has-[:checked]:bg-sand">
+      <input type="radio" name={name} value={value} defaultChecked={defaultChecked} className="accent-pine" />
+      {label}
+    </label>
+  );
+}
+
+function WeightField({ value }: { value: number | null }) {
+  const initial = value ?? weightSliderMaxKg;
+
+  return (
+    <div>
+      <label htmlFor="filter-weight" className="block text-sm font-medium">
+        Zulässiges Gesamtgewicht bis
+        <span id="filter-weight-label" className="mt-1 block text-sm font-normal text-muted">
+          {weightText(initial)}
+        </span>
+        <input
+          id="filter-weight"
+          type="range"
+          min={weightSliderMinKg}
+          max={weightSliderMaxKg}
+          step={50}
+          defaultValue={initial}
+          aria-valuemin={weightSliderMinKg}
+          aria-valuemax={weightSliderMaxKg}
+          aria-valuenow={initial}
+          aria-valuetext={weightText(initial)}
+          name="weight_max"
+          className="mt-3 w-full accent-pine"
+        />
+      </label>
+      <button
+        id="filter-weight-preset"
+        type="button"
+        aria-pressed={initial === weightLimitKg}
+        className="mt-2 inline-flex h-9 items-center rounded-full border border-line px-3 text-sm font-medium hover:bg-sand aria-pressed:border-pine aria-pressed:bg-sand"
+      >
+        bis 3.500 kg
+      </button>
+    </div>
+  );
+}
+
+function advancedCount(filters: VehicleFilters): number {
+  const basic = filterLabels({
+    ...filters,
+    body: "",
+    yearMin: null,
+    yearMax: null,
+    mileageMin: null,
+    mileageMax: null,
+    condition: "",
+    city: "",
+    seller: "",
+    weightMax: null,
+    lengthMin: null,
+    lengthMax: null,
+    powerMin: null,
+    solar: false,
+    inverter: false,
+    awning: false,
+    air: false,
+    fuel: "",
+    transmission: "",
+    bed: "",
+    climate: "",
+    sleepMin: null,
+    heater: false,
+    shower: false,
+    toilet: false,
+    seating: false,
+    sat: false,
+    bike: false,
+    hitch: false,
+  });
+  return Math.max(0, filterLabels(filters).length - basic.length);
+}
+
+function isCategory(value: string): value is ListingCategory {
+  return listingCategories.some((entry) => entry === value);
 }
 
 function weightText(value: number): string {

@@ -3,14 +3,18 @@ import {
   canonicalBodyType,
   categoryOfBody,
   climateOptions,
+  conditions,
   fuels,
   isListingCategory,
+  listingAudiences,
   transmissions,
 } from "@/lib/listing-options";
 import { vehicles, type Vehicle } from "@/lib/vehicles";
 
 export const weightLimitKg = 3500;
 export const weightSliderMaxKg = 7500;
+
+export type SellerKind = "" | "privat" | "haendler";
 
 export type VehicleFilters = {
   brand: string;
@@ -19,7 +23,17 @@ export type VehicleFilters = {
   body: string;
   priceMin: number | null;
   priceMax: number | null;
+  yearMin: number | null;
+  yearMax: number | null;
+  mileageMin: number | null;
+  mileageMax: number | null;
+  condition: string;
+  city: string;
+  seller: SellerKind;
   weightMax: number | null;
+  lengthMin: number | null;
+  lengthMax: number | null;
+  powerMin: number | null;
   solar: boolean;
   inverter: boolean;
   awning: boolean;
@@ -29,7 +43,16 @@ export type VehicleFilters = {
   bed: string;
   climate: string;
   sleepMin: number | null;
+  heater: boolean;
+  shower: boolean;
+  toilet: boolean;
+  seating: boolean;
+  sat: boolean;
+  bike: boolean;
+  hitch: boolean;
 };
+
+export const standHeating = ["Dieselstandheizung", "Webasto", "Autoterm"] as const;
 
 type SearchParamValue = string | string[] | undefined;
 
@@ -41,7 +64,17 @@ export function blankFilters(): VehicleFilters {
     body: "",
     priceMin: null,
     priceMax: null,
+    yearMin: null,
+    yearMax: null,
+    mileageMin: null,
+    mileageMax: null,
+    condition: "",
+    city: "",
+    seller: "",
     weightMax: null,
+    lengthMin: null,
+    lengthMax: null,
+    powerMin: null,
     solar: false,
     inverter: false,
     awning: false,
@@ -51,6 +84,13 @@ export function blankFilters(): VehicleFilters {
     bed: "",
     climate: "",
     sleepMin: null,
+    heater: false,
+    shower: false,
+    toilet: false,
+    seating: false,
+    sat: false,
+    bike: false,
+    hitch: false,
   };
 }
 
@@ -105,7 +145,17 @@ export function searchHref(filters: VehicleFilters): string {
   setText(params, "body", filters.body);
   setText(params, "price_min", filters.priceMin);
   setText(params, "price_max", filters.priceMax);
+  setText(params, "year_min", filters.yearMin);
+  setText(params, "year_max", filters.yearMax);
+  setText(params, "mileage_min", filters.mileageMin);
+  setText(params, "mileage_max", filters.mileageMax);
+  setText(params, "condition", filters.condition);
+  setText(params, "city", filters.city);
+  setText(params, "seller", filters.seller);
   setText(params, "weight_max", filters.weightMax);
+  setText(params, "length_min", filters.lengthMin);
+  setText(params, "length_max", filters.lengthMax);
+  setText(params, "power_min", filters.powerMin);
   setFlag(params, "solar", filters.solar);
   setFlag(params, "inverter", filters.inverter);
   setFlag(params, "awning", filters.awning);
@@ -115,6 +165,13 @@ export function searchHref(filters: VehicleFilters): string {
   setText(params, "bed", filters.bed);
   setText(params, "climate", filters.climate);
   setText(params, "sleep_min", filters.sleepMin);
+  setFlag(params, "heater", filters.heater);
+  setFlag(params, "shower", filters.shower);
+  setFlag(params, "toilet", filters.toilet);
+  setFlag(params, "seating", filters.seating);
+  setFlag(params, "sat", filters.sat);
+  setFlag(params, "bike", filters.bike);
+  setFlag(params, "hitch", filters.hitch);
 
   const query = params.toString();
   return query ? `/suche?${query}` : "/suche";
@@ -140,9 +197,19 @@ export function filterLabels(filters: VehicleFilters): string[] {
     filters.model ? `Modell ${filters.model}` : "",
     filters.type ? `Typ ${filters.type}` : "",
     filters.body ? `Aufbau ${filters.body}` : "",
-    filters.priceMin !== null ? `ab ${filters.priceMin} €` : "",
-    filters.priceMax !== null ? `bis ${filters.priceMax} €` : "",
+    filters.priceMin !== null ? `ab ${filters.priceMin.toLocaleString("de-DE")} €` : "",
+    filters.priceMax !== null ? `bis ${filters.priceMax.toLocaleString("de-DE")} €` : "",
+    filters.yearMin !== null ? `Erstzulassung ab ${filters.yearMin}` : "",
+    filters.yearMax !== null ? `Erstzulassung bis ${filters.yearMax}` : "",
+    filters.mileageMin !== null ? `ab ${filters.mileageMin.toLocaleString("de-DE")} km` : "",
+    filters.mileageMax !== null ? `bis ${filters.mileageMax.toLocaleString("de-DE")} km` : "",
+    filters.condition ? filters.condition : "",
+    filters.city ? `Ort ${filters.city}` : "",
+    filters.seller === "haendler" ? "Händler" : filters.seller === "privat" ? "Privat" : "",
     filters.weightMax !== null ? `Gewicht bis ${filters.weightMax.toLocaleString("de-DE")} kg` : "",
+    filters.lengthMin !== null ? `Länge ab ${filters.lengthMin.toLocaleString("de-DE")} cm` : "",
+    filters.lengthMax !== null ? `Länge bis ${filters.lengthMax.toLocaleString("de-DE")} cm` : "",
+    filters.powerMin !== null ? `ab ${filters.powerMin.toLocaleString("de-DE")} PS` : "",
     filters.solar ? "Solaranlage" : "",
     filters.inverter ? "Wechselrichter" : "",
     filters.awning ? "Markise" : "",
@@ -152,7 +219,62 @@ export function filterLabels(filters: VehicleFilters): string[] {
     filters.bed ? `Bett ${filters.bed}` : "",
     filters.climate ? filters.climate : "",
     filters.sleepMin !== null ? `ab ${filters.sleepMin} Schlafplätzen` : "",
+    filters.heater ? "Standheizung" : "",
+    filters.shower ? "separate Dusche" : "",
+    filters.toilet ? "WC" : "",
+    filters.seating ? "Rundsitzgruppe" : "",
+    filters.sat ? "SAT-TV" : "",
+    filters.bike ? "Fahrradträger" : "",
+    filters.hitch ? "Anhängerkupplung" : "",
   ].filter((entry) => entry.length > 0);
+}
+
+export function hasAdvancedFilters(filters: VehicleFilters): boolean {
+  return (
+    filters.body.length > 0 ||
+    filters.yearMin !== null ||
+    filters.yearMax !== null ||
+    filters.mileageMin !== null ||
+    filters.mileageMax !== null ||
+    filters.condition.length > 0 ||
+    filters.city.length > 0 ||
+    filters.seller.length > 0 ||
+    filters.weightMax !== null ||
+    filters.lengthMin !== null ||
+    filters.lengthMax !== null ||
+    filters.powerMin !== null ||
+    filters.solar ||
+    filters.inverter ||
+    filters.awning ||
+    filters.air ||
+    filters.fuel.length > 0 ||
+    filters.transmission.length > 0 ||
+    filters.bed.length > 0 ||
+    filters.climate.length > 0 ||
+    filters.sleepMin !== null ||
+    filters.heater ||
+    filters.shower ||
+    filters.toilet ||
+    filters.seating ||
+    filters.sat ||
+    filters.bike ||
+    filters.hitch
+  );
+}
+
+export function wantsExpandedFilters(
+  value: SearchParamValue,
+  filters: VehicleFilters,
+): boolean {
+  const raw = firstParam(value);
+  if (raw === "0") {
+    return false;
+  }
+  if (raw === "1") {
+    return true;
+  }
+
+  return hasAdvancedFilters(filters);
 }
 
 export function searchTitle(filters: VehicleFilters): string {
@@ -165,6 +287,9 @@ export function camperFilterActive(filters: VehicleFilters): boolean {
   return (
     filters.body.length > 0 ||
     filters.weightMax !== null ||
+    filters.lengthMin !== null ||
+    filters.lengthMax !== null ||
+    filters.powerMin !== null ||
     filters.solar ||
     filters.inverter ||
     filters.awning ||
@@ -173,7 +298,14 @@ export function camperFilterActive(filters: VehicleFilters): boolean {
     filters.transmission.length > 0 ||
     filters.bed.length > 0 ||
     filters.climate.length > 0 ||
-    filters.sleepMin !== null
+    filters.sleepMin !== null ||
+    filters.heater ||
+    filters.shower ||
+    filters.toilet ||
+    filters.seating ||
+    filters.sat ||
+    filters.bike ||
+    filters.hitch
   );
 }
 
@@ -197,7 +329,17 @@ export function parseStoredFilters(value: unknown): VehicleFilters {
     body: textValue(value.body),
     price_min: textValue(value.priceMin),
     price_max: textValue(value.priceMax),
+    year_min: textValue(value.yearMin),
+    year_max: textValue(value.yearMax),
+    mileage_min: textValue(value.mileageMin),
+    mileage_max: textValue(value.mileageMax),
+    condition: textValue(value.condition),
+    city: textValue(value.city),
+    seller: textValue(value.seller),
     weight_max: textValue(value.weightMax),
+    length_min: textValue(value.lengthMin),
+    length_max: textValue(value.lengthMax),
+    power_min: textValue(value.powerMin),
     solar: flagValue(value.solar),
     inverter: flagValue(value.inverter),
     awning: flagValue(value.awning),
@@ -207,6 +349,13 @@ export function parseStoredFilters(value: unknown): VehicleFilters {
     bed: textValue(value.bed),
     climate: textValue(value.climate),
     sleep_min: textValue(value.sleepMin),
+    heater: flagValue(value.heater),
+    shower: flagValue(value.shower),
+    toilet: flagValue(value.toilet),
+    seating: flagValue(value.seating),
+    sat: flagValue(value.sat),
+    bike: flagValue(value.bike),
+    hitch: flagValue(value.hitch),
   });
 }
 
@@ -222,41 +371,32 @@ function flagValue(value: unknown): string {
   return value === true || value === "1" || value === "true" ? "1" : "";
 }
 
-export function parseFilters(params: {
-  brand?: SearchParamValue;
-  model?: SearchParamValue;
-  type?: SearchParamValue;
-  body?: SearchParamValue;
-  price_min?: SearchParamValue;
-  price_max?: SearchParamValue;
-  weight_max?: SearchParamValue;
-  solar?: SearchParamValue;
-  inverter?: SearchParamValue;
-  awning?: SearchParamValue;
-  air?: SearchParamValue;
-  fuel?: SearchParamValue;
-  transmission?: SearchParamValue;
-  bed?: SearchParamValue;
-  climate?: SearchParamValue;
-  sleep_min?: SearchParamValue;
-  marke?: SearchParamValue;
-  modell?: SearchParamValue;
-  typ?: SearchParamValue;
-}): VehicleFilters {
+export function parseFilters(params: Partial<Record<string, SearchParamValue>>): VehicleFilters {
   const requestedType = firstParam(params.type) || firstParam(params.typ);
   const requestedBody = firstParam(params.body);
   const kind = requestedBody
     ? { type: requestedType, body: canonicalBodyType(requestedBody) ?? "" }
     : splitKind(requestedType);
+  const city = firstParam(params.city).slice(0, 80);
 
-  return motorhomeOnly({
+  return forCategory({
     brand: firstParam(params.brand) || firstParam(params.marke),
     model: firstParam(params.model) || firstParam(params.modell),
     type: listingType(kind),
     body: kind.body,
     priceMin: priceParam(params.price_min),
     priceMax: priceParam(params.price_max),
+    yearMin: boundedInt(params.year_min, 1950, 2035),
+    yearMax: boundedInt(params.year_max, 1950, 2035),
+    mileageMin: boundedInt(params.mileage_min, 0, 2_000_000),
+    mileageMax: boundedInt(params.mileage_max, 0, 2_000_000),
+    condition: choiceParam(params.condition, conditions),
+    city,
+    seller: sellerParam(params.seller),
     weightMax: boundedInt(params.weight_max, 500, 20_000),
+    lengthMin: boundedInt(params.length_min, 100, 2_000),
+    lengthMax: boundedInt(params.length_max, 100, 2_000),
+    powerMin: boundedInt(params.power_min, 1, 2_000),
     solar: flagParam(params.solar),
     inverter: flagParam(params.inverter),
     awning: flagParam(params.awning),
@@ -266,29 +406,73 @@ export function parseFilters(params: {
     bed: choiceParam(params.bed, bedTypes),
     climate: choiceParam(params.climate, climateOptions),
     sleepMin: boundedInt(params.sleep_min, 1, 12),
+    heater: flagParam(params.heater),
+    shower: flagParam(params.shower),
+    toilet: flagParam(params.toilet),
+    seating: flagParam(params.seating),
+    sat: flagParam(params.sat),
+    bike: flagParam(params.bike),
+    hitch: flagParam(params.hitch),
   });
 }
 
-function motorhomeOnly(filters: VehicleFilters): VehicleFilters {
-  const weightMax = filters.weightMax !== null && filters.weightMax >= weightSliderMaxKg ? null : filters.weightMax;
-  if (selectedCategory(filters) === "Wohnmobil") {
-    return { ...filters, weightMax };
+function sellerParam(value: SearchParamValue): SellerKind {
+  const raw = firstParam(value).toLocaleLowerCase("de-DE");
+  if (raw === "privat") {
+    return "privat";
+  }
+  if (raw === "haendler" || raw === "händler") {
+    return "haendler";
   }
 
-  return {
-    ...filters,
-    body: "",
-    weightMax: null,
-    solar: false,
-    inverter: false,
-    awning: false,
-    air: false,
-    fuel: "",
-    transmission: "",
-    bed: "",
-    climate: "",
-    sleepMin: null,
-  };
+  return "";
+}
+
+function allows(category: string, options: readonly string[]): boolean {
+  return category === "" || options.includes(category);
+}
+
+export function forCategory(filters: VehicleFilters): VehicleFilters {
+  const next = { ...filters };
+  const owner = next.body ? categoryOfBody(next.body) : null;
+  if (next.type && owner && owner !== next.type) {
+    next.body = "";
+  }
+
+  const weightMax = next.weightMax !== null && next.weightMax >= weightSliderMaxKg ? null : next.weightMax;
+  next.weightMax = weightMax;
+  if (next.yearMin !== null && next.yearMax !== null && next.yearMin > next.yearMax) {
+    next.yearMax = next.yearMin;
+  }
+  if (next.mileageMin !== null && next.mileageMax !== null && next.mileageMin > next.mileageMax) {
+    next.mileageMax = next.mileageMin;
+  }
+  if (next.lengthMin !== null && next.lengthMax !== null && next.lengthMin > next.lengthMax) {
+    next.lengthMax = next.lengthMin;
+  }
+
+  if (!allows(next.type, listingAudiences.motorhome)) {
+    next.mileageMin = null;
+    next.mileageMax = null;
+    next.fuel = "";
+    next.transmission = "";
+    next.powerMin = null;
+  }
+  if (!allows(next.type, listingAudiences.living)) {
+    next.sleepMin = null;
+    next.bed = "";
+    next.climate = "";
+    next.heater = false;
+    next.shower = false;
+    next.toilet = false;
+    next.seating = false;
+  }
+  if (!allows(next.type, listingAudiences.exterior)) {
+    next.awning = false;
+    next.air = false;
+  }
+
+  return next;
 }
 
 function listingType(kind: { type: string; body: string }): string {

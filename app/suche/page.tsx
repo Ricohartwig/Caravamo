@@ -2,10 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { saveSearch } from "@/actions/account";
-import { SearchFilters } from "@/components/SearchFilters";
+import { SearchShell } from "@/components/SearchFilters";
 import { VehicleCard } from "@/components/VehicleCard";
 import { loadCardMarks, marksFor } from "@/lib/account";
-import { filterLabels, parseFilters, searchHref, searchTitle, type VehicleFilters } from "@/lib/filters";
+import { filterLabels, parseFilters, searchHref, searchTitle, wantsExpandedFilters, type VehicleFilters } from "@/lib/filters";
 import { formatOfferCount } from "@/lib/format";
 import { searchOffers } from "@/lib/published-listings";
 
@@ -19,7 +19,7 @@ export default function SuchePage({ searchParams }: PageProps<"/suche">) {
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
       <h1 className="text-3xl font-semibold tracking-tight">Fahrzeuge suchen</h1>
       <p className="mt-2 max-w-2xl text-muted">
-        Die Treffer kommen aus den veröffentlichten Inseraten. Bei Wohnmobilen klappen Aufbau, Gewicht und Technik in der Seitenleiste auf.
+        Zuerst Marke, Modell, Fahrzeugart und Preis. Weitere Filter klappen links auf, mit Zustand, Laufleistung, Maßen und Ausstattung.
       </p>
       <Suspense fallback={<SearchFallback />}>
         <SearchResults searchParams={searchParams} />
@@ -33,15 +33,15 @@ async function SearchResults({
 }: {
   searchParams: PageProps<"/suche">["searchParams"];
 }) {
-  const filters = parseFilters(await searchParams);
+  const params = await searchParams;
+  const filters = parseFilters(params);
   const [results, marks] = await Promise.all([searchOffers(filters), loadCardMarks(searchHref(filters))]);
   const active = filterLabels(filters);
 
   return (
-    <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-      <SearchFilters key={searchHref(filters)} filters={filters} />
-      <section className="min-w-0 flex-1" aria-label="Suchergebnisse">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <SearchShell key={searchHref(filters)} filters={filters} startOpen={wantsExpandedFilters(params.erweitert, filters)}>
+      <section aria-label="Suchergebnisse">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <p className="text-sm font-medium text-muted">
             {formatOfferCount(results.length)}
             {active.length > 0 ? ` · ${active.join(" · ")}` : ""}
@@ -71,7 +71,7 @@ async function SearchResults({
           </ul>
         )}
       </section>
-    </div>
+    </SearchShell>
   );
 }
 
@@ -79,7 +79,7 @@ function SaveSearchForm({ filters }: { filters: VehicleFilters }) {
   const params = new URLSearchParams(searchHref(filters).split("?")[1] ?? "");
 
   return (
-    <form action={saveSearch} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <form action={saveSearch} className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
       {[...params.entries()].map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
@@ -91,7 +91,7 @@ function SaveSearchForm({ filters }: { filters: VehicleFilters }) {
         name="name"
         defaultValue={searchTitle(filters)}
         maxLength={80}
-        className="h-11 rounded-xl border border-line bg-card px-3 text-sm"
+        className="h-11 min-w-48 rounded-xl border border-line bg-card px-3 text-sm"
       />
       <button
         type="submit"
