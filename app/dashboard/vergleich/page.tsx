@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { toggleComparison } from "@/actions/account";
+import { toggleComparison, toggleFavorite } from "@/actions/account";
+import { Heart } from "lucide-react";
 import { VehiclePlaceholder } from "@/components/VehiclePlaceholder";
-import { currentUser, listComparison } from "@/lib/account";
+import { currentUser, listComparison, loadCardMarks } from "@/lib/account";
 import { formatPrice } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -33,7 +34,7 @@ async function Comparison({ searchParams }: { searchParams: Promise<{ hinweis?: 
 
   const params = await searchParams;
   const noticeKey = Array.isArray(params.hinweis) ? params.hinweis[0] : params.hinweis;
-  const columns = await listComparison(user.id);
+  const [columns, marks] = await Promise.all([listComparison(user.id), loadCardMarks("/dashboard/vergleich")]);
   const prices = columns.flatMap((column) => (column.price !== null ? [column.price] : []));
   const lowest = prices.length > 1 ? Math.min(...prices) : null;
 
@@ -77,6 +78,23 @@ async function Comparison({ searchParams }: { searchParams: Promise<{ hinweis?: 
                         <span className="ml-2 rounded-full bg-sand px-2 py-0.5 text-xs font-medium text-pine">günstigster</span>
                       ) : null}
                     </p>
+                    <form action={toggleFavorite} className="mt-3">
+                      <input type="hidden" name="vehicleId" value={column.id} />
+                      <input type="hidden" name="saved" value={marks.favorites.has(column.id) ? "1" : "0"} />
+                      <input type="hidden" name="returnTo" value="/dashboard/vergleich" />
+                      <button
+                        type="submit"
+                        className="inline-flex h-10 items-center gap-2 rounded-full border border-line px-3 text-sm font-semibold hover:bg-sand"
+                        aria-pressed={marks.favorites.has(column.id)}
+                      >
+                        <Heart
+                          aria-hidden="true"
+                          className="size-4 text-copper-dark"
+                          fill={marks.favorites.has(column.id) ? "currentColor" : "none"}
+                        />
+                        {marks.favorites.has(column.id) ? "Gemerkt" : "Merken"}
+                      </button>
+                    </form>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {column.available ? (
                         <Link href={column.href} className="text-sm font-semibold text-pine hover:underline">

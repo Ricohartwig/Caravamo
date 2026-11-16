@@ -396,5 +396,6 @@ function refreshAccount(vehicleId?: string) {
   revalidatePath("/suche");
   if (vehicleId) {
     revalidatePath(`/fahrzeug/${vehicleId}`);
+    revalidatePath(`/vorschau/${vehicleId}`);
   }
 }

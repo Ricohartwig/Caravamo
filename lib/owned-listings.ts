@@ -139,6 +139,16 @@ export async function getOwnedDraft(userId: string, id: string): Promise<OwnedDr
   };
 }
 
+export async function ownerSaveCount(vehicleId: string): Promise<number> {
+  if (!isSupabaseConfigured() || !isVehicleId(vehicleId)) {
+    return 0;
+  }
+
+  const supabase = await createClient();
+  const signals = await listingSignals(supabase, [vehicleId]);
+  return signals.get(vehicleId)?.saves ?? 0;
+}
+
 async function listingSignals(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ids: string[],

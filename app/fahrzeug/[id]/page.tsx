@@ -5,6 +5,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { PublishedExpose } from "@/components/PublishedExpose";
 import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
 import { listingDescription, listingTitle } from "@/lib/listing-seo";
+import { ownerSaveCount } from "@/lib/owned-listings";
 import { getPublishedListing } from "@/lib/published-listings";
 import { createPublicClient } from "@/utils/supabase/public";
 
@@ -78,6 +79,7 @@ async function VehicleExpose({
   }
 
   const saved = viewer ? await loadCardMarks(`/fahrzeug/${listing.id}`) : null;
+  const savedCount = viewer && viewer.id === listing.sellerId ? await ownerSaveCount(listing.id) : null;
 
   return (
     <>
@@ -85,6 +87,7 @@ async function VehicleExpose({
       <PublishedExpose
         listing={listing}
         viewerId={viewer?.id ?? null}
+        savedCount={savedCount}
         marks={{
           signedIn: Boolean(viewer),
           saved: saved?.favorites.has(listing.id) ?? false,

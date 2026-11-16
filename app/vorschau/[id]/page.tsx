@@ -6,7 +6,7 @@ import { ListingControls } from "@/components/dashboard/ListingControls";
 import { currentUser, loadCardMarks } from "@/lib/account";
 import { formatDay } from "@/lib/format";
 import { listingStand, paidTimeLeft } from "@/lib/listing-state";
-import { isVehicleId } from "@/lib/owned-listings";
+import { isVehicleId, ownerSaveCount } from "@/lib/owned-listings";
 import { getOwnedPreview } from "@/lib/published-listings";
 
 export const instant = false;
@@ -50,7 +50,7 @@ export default async function PreviewPage({
   const status = typeof listing.values.status === "string" ? listing.values.status : "entwurf";
   const publishedUntil = typeof listing.values.published_until === "string" ? listing.values.published_until : null;
   const stand = listingStand(status, publishedUntil);
-  const saved = await loadCardMarks(`/vorschau/${id}`);
+  const [saved, savedCount] = await Promise.all([loadCardMarks(`/vorschau/${id}`), ownerSaveCount(id)]);
 
   return (
     <>
@@ -93,6 +93,7 @@ export default async function PreviewPage({
       <PublishedExpose
         listing={listing}
         viewerId={user.id}
+        savedCount={savedCount}
         marks={{
           signedIn: true,
           saved: saved.favorites.has(id),
