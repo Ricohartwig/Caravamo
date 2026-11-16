@@ -1,8 +1,20 @@
-import { Search, SlidersHorizontal } from "lucide-react";
-import { allBodyTypes, listingCategories } from "@/lib/listing-options";
+import Link from "next/link";
+import { Search } from "lucide-react";
+import { BodyGlyph, type BodyGlyphKind } from "@/components/BodyGlyph";
+import { formatOfferCount } from "@/lib/format";
+import { conditions } from "@/lib/listing-options";
 
 const fieldClassName =
   "mt-1.5 w-full rounded-xl border border-line bg-foam px-3 py-3 text-base text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pine";
+
+const homeBodies: Array<{ href: string; label: string; glyph: BodyGlyphKind }> = [
+  { href: "/suche?body=Teilintegriert", label: "Teilintegriert", glyph: "teil" },
+  { href: "/suche?body=Vollintegriert", label: "Integriert", glyph: "voll" },
+  { href: "/suche?body=Alkoven", label: "Alkoven", glyph: "alkoven" },
+  { href: "/suche?body=Kastenwagen%20(Campervan)", label: "Kastenwagen", glyph: "kasten" },
+  { href: "/suche?type=Wohnwagen", label: "Wohnwagen", glyph: "wohnwagen" },
+  { href: "/suche?type=Dachzelt%2FFaltanh%C3%A4nger", label: "Dachzelt", glyph: "dachzelt" },
+];
 
 const homeScript = `
 (function () {
@@ -20,75 +32,72 @@ const homeScript = `
 })();
 `;
 
-export function SearchBox() {
+export function SearchBox({ count }: { count: number | null }) {
   return (
-    <form
-      id="home-search"
-      action="/suche"
-      method="get"
-      aria-label="Fahrzeugsuche"
-      className="mt-8 grid gap-3 rounded-2xl bg-card p-4 text-foreground shadow-xl sm:p-5 lg:grid-cols-3"
-    >
-      <label htmlFor="brand" className="text-sm font-medium">
-        Marke
-        <input id="brand" name="brand" list="marken-vorschlaege" className={fieldClassName} />
-      </label>
-      <label htmlFor="model" className="text-sm font-medium">
-        Modell
-        <input id="model" name="model" className={fieldClassName} />
-      </label>
-      <label htmlFor="type" className="text-sm font-medium">
-        Fahrzeugtyp
-        <select id="type" name="type" defaultValue="" className={fieldClassName}>
-          <option value="">Alle Fahrzeugtypen</option>
-          <optgroup label="Fahrzeugart">
-            {listingCategories.map((entry) => (
-              <option key={entry} value={entry}>
-                {entry}
+    <div className="rounded-3xl bg-card p-4 text-foreground shadow-xl sm:p-6">
+      <h2 className="text-xl font-semibold tracking-tight">Wohnmobile und Wohnwagen kaufen</h2>
+      <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {homeBodies.map((entry) => (
+          <li key={entry.label}>
+            <Link
+              href={entry.href}
+              className="flex h-full flex-col items-center justify-center gap-1 rounded-2xl border border-line px-2 py-3 text-center text-xs font-medium hover:border-pine hover:bg-sand"
+            >
+              <BodyGlyph kind={entry.glyph} />
+              {entry.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <form id="home-search" action="/suche" method="get" aria-label="Fahrzeugsuche" className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto_auto] lg:items-end">
+        <label htmlFor="brand" className="text-sm font-medium">
+          Marke
+          <input id="brand" name="brand" list="marken-vorschlaege" className={fieldClassName} />
+        </label>
+        <label htmlFor="condition" className="text-sm font-medium">
+          Zustand
+          <select id="condition" name="condition" defaultValue="" className={fieldClassName}>
+            <option value="">Neu und gebraucht</option>
+            {conditions.map((condition) => (
+              <option key={condition} value={condition}>
+                {condition}
               </option>
             ))}
-          </optgroup>
-          <optgroup label="Aufbau">
-            {allBodyTypes.map((entry) => (
-              <option key={entry} value={entry}>
-                {entry}
+          </select>
+        </label>
+        <label htmlFor="sleep-min" className="text-sm font-medium">
+          Schlafplätze mind.
+          <select id="sleep-min" name="sleep_min" defaultValue="" className={fieldClassName}>
+            <option value="">Egal</option>
+            {[2, 3, 4, 5, 6].map((places) => (
+              <option key={places} value={places}>
+                {places}
               </option>
             ))}
-          </optgroup>
-        </select>
-      </label>
-      <label htmlFor="price-min" className="text-sm font-medium">
-        Preis von
-        <input id="price-min" name="price_min" inputMode="numeric" className={fieldClassName} />
-      </label>
-      <label htmlFor="price-max" className="text-sm font-medium">
-        Preis bis
-        <input id="price-max" name="price_max" inputMode="numeric" className={fieldClassName} />
-      </label>
-      <div className="flex flex-col gap-2 self-end sm:flex-row lg:col-span-3">
-        <button
-          type="submit"
-          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-copper-dark px-5 font-semibold text-foam hover:bg-copper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copper-dark"
-        >
-          <Search aria-hidden="true" className="size-4" />
-          Suchen
-        </button>
+          </select>
+        </label>
         <button
           type="submit"
           name="erweitert"
           value="1"
-          className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-foam px-5 font-semibold text-foreground hover:bg-sand"
+          className="inline-flex h-12 items-center justify-center px-2 text-sm font-semibold text-pine hover:underline"
         >
-          <SlidersHorizontal aria-hidden="true" className="size-4" />
-          Weitere Filter
+          Zur Detailsuche
         </button>
-      </div>
-      <datalist id="marken-vorschlaege">
-        {["Challenger", "Fiat", "Hobby", "Knaus", "Weinsberg"].map((entry) => (
-          <option key={entry} value={entry} />
-        ))}
-      </datalist>
-      <script dangerouslySetInnerHTML={{ __html: homeScript }} />
-    </form>
+        <button
+          type="submit"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-pine px-5 font-semibold text-foam hover:bg-pine-deep"
+        >
+          <Search aria-hidden="true" className="size-4" />
+          {count === null ? "Suchen" : formatOfferCount(count)}
+        </button>
+        <datalist id="marken-vorschlaege">
+          {["Challenger", "Fiat", "Hobby", "Knaus", "Weinsberg"].map((entry) => (
+            <option key={entry} value={entry} />
+          ))}
+        </datalist>
+        <script dangerouslySetInnerHTML={{ __html: homeScript }} />
+      </form>
+    </div>
   );
 }
