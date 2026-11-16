@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { JsonLd } from "@/components/JsonLd";
 import { PublishedExpose } from "@/components/PublishedExpose";
 import { currentUser, loadCardMarks, rememberView } from "@/lib/account";
+import { getDealer, listDealerOffers } from "@/lib/dealers";
 import { listingDescription, listingTitle } from "@/lib/listing-seo";
 import { ownerSaveCount } from "@/lib/owned-listings";
 import { getPublishedListing } from "@/lib/published-listings";
@@ -78,8 +79,14 @@ async function VehicleExpose({
     await createPublicClient().rpc("bump_listing_view", { listing_id: listing.id });
   }
 
-  const saved = viewer ? await loadCardMarks(`/fahrzeug/${listing.id}`) : null;
-  const savedCount = viewer && viewer.id === listing.sellerId ? await ownerSaveCount(listing.id) : null;
+  const returnTo = `/fahrzeug/${listing.id}`;
+  const [saved, savedCount, dealer, offers] = await Promise.all([
+    viewer ? loadCardMarks(returnTo) : Promise.resolve(null),
+    viewer && viewer.id === listing.sellerId ? ownerSaveCount(listing.id) : Promise.resolve(null),
+    listing.sellerKind === "Händler" ? getDealer(listing.sellerId) : Promise.resolve(null),
+    listDealerOffers(listing.sellerId),
+  ]);
+  const otherOffers = offers.filter((offer) => offer.id !== listing.id);
 
   return (
     <>
@@ -88,11 +95,14 @@ async function VehicleExpose({
         listing={listing}
         viewerId={viewer?.id ?? null}
         savedCount={savedCount}
+        dealer={dealer}
+        otherOffers={otherOffers}
+        library={saved}
         marks={{
           signedIn: Boolean(viewer),
           saved: saved?.favorites.has(listing.id) ?? false,
           compared: saved?.comparisons.has(listing.id) ?? false,
-          returnTo: `/fahrzeug/${listing.id}`,
+          returnTo,
         }}
       />
     </>
