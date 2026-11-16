@@ -7,7 +7,7 @@ import type { AccountCounts } from "@/lib/account";
 
 const items = [
   { href: "/dashboard", label: "Übersicht", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/merkliste", label: "Merkliste", icon: Heart, count: "favorites" },
+  { href: "/dashboard/merkliste", label: "Meine gemerkten Fahrzeuge", icon: Heart, count: "favorites" },
   { href: "/dashboard/suchen", label: "Suchen", icon: Search, count: "searches" },
   { href: "/dashboard/anfragen", label: "Anfragen", icon: MessageSquare, count: "unread" },
   { href: "/dashboard/gesehen", label: "Angesehen", icon: Eye, count: "views" },

@@ -8,7 +8,7 @@ import { currentUser, listFavorites, loadCardMarks, marksFor, type SavedVehicle 
 import { formatPrice } from "@/lib/format";
 
 export const metadata: Metadata = {
-  title: "Merkliste",
+  title: "Meine gemerkten Fahrzeuge",
   description: "Gespeicherte Fahrzeuge und Preisänderungen.",
 };
 
@@ -40,7 +40,7 @@ async function Favorites({ searchParams }: { searchParams: Promise<{ hinweis?: s
   const [favorites, marks] = await Promise.all([listFavorites(user.id), loadCardMarks("/dashboard/merkliste")]);
   return (
     <div>
-      <h1 className="text-3xl font-semibold tracking-tight">Merkliste</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Meine gemerkten Fahrzeuge</h1>
       <p className="mt-2 max-w-2xl text-muted">
         Der Preis zum Zeitpunkt des Merkens bleibt stehen. Steigt oder fällt er, siehst du den Unterschied.
       </p>

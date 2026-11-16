@@ -66,7 +66,7 @@ async function Overview({
   const expiring = listingsExpiringWithin(vehicles);
 
   const cards = [
-    { href: "/dashboard/merkliste", label: "Merkliste", value: counts.favorites, text: "Fahrzeuge, die du behalten willst" },
+    { href: "/dashboard/merkliste", label: "Meine gemerkten Fahrzeuge", value: counts.favorites, text: "Fahrzeuge, die du behalten willst" },
     { href: "/dashboard/suchen", label: "Gespeicherte Suchen", value: counts.searches, text: "Filter, die du wiederholen willst" },
     { href: "/dashboard/anfragen", label: "Ungelesene Anfragen", value: counts.unread, text: "Nachrichten von und an Anbieter" },
     { href: "/dashboard/inserate", label: "Eigene Inserate", value: counts.listings, text: profile.business ? "Einzeln 6,99 € oder ein Monatspaket" : "Privat, 4,99 € je 30 Tage" },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SavedCount } from "@/components/account/SavedCount";
 import { ListingFacts } from "@/components/ListingFacts";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { SellerContact } from "@/components/SellerContact";
@@ -13,10 +14,12 @@ export function PublishedExpose({
   listing,
   viewerId,
   marks,
+  savedCount = null,
 }: {
   listing: PublishedListing;
   viewerId: string | null;
   marks: CardMarks;
+  savedCount?: number | null;
 }) {
   const price = listing.priceTax
     ? `${formatPrice(listing.price)} ${listing.priceTax}`
@@ -39,6 +42,11 @@ export function PublishedExpose({
         {badge ? <p className="rounded-full bg-sand px-2.5 py-1 text-xs font-medium text-pine">{badge}</p> : null}
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight">{price}</p>
+      {savedCount !== null ? (
+        <div className="mt-3">
+          <SavedCount count={savedCount} />
+        </div>
+      ) : null}
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           {listing.imageUrls.length > 0 ? (

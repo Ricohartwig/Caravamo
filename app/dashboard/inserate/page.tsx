@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Heart } from "lucide-react";
 import { payForListing } from "@/actions/checkout";
 import { publishWithPackage } from "@/actions/packages";
 import { DeleteListingButton } from "@/components/dashboard/DeleteListingButton";
@@ -148,7 +149,7 @@ function OwnedListingRow({ vehicle, packageFree }: { vehicle: OwnedVehicle; pack
           {formatPrice(vehicle.price)} · {vehicle.type}
           {until && (stand === "aktiv" || stand === "inaktiv") ? ` · Laufzeit bis ${until}` : ""}
         </p>
-        <dl className="mt-3 grid max-w-md grid-cols-2 gap-2 text-sm">
+        <dl className="mt-3 grid max-w-xl grid-cols-3 gap-2 text-sm">
           <div className="rounded-xl bg-sand px-3 py-2">
             <dt className="text-muted">Exposé aufgerufen</dt>
             <dd className="text-lg font-semibold">{formatCount(vehicle.viewCount)}</dd>
@@ -157,8 +158,14 @@ function OwnedListingRow({ vehicle, packageFree }: { vehicle: OwnedVehicle; pack
             <dt className="text-muted">Kontaktanfragen</dt>
             <dd className="text-lg font-semibold">{formatCount(vehicle.inquiryCount)}</dd>
           </div>
+          <div className="rounded-xl bg-sand px-3 py-2">
+            <dt className="inline-flex items-center gap-1 text-muted">
+              <Heart aria-hidden="true" className="size-3.5 text-copper-dark" fill="currentColor" />
+              Gemerkt
+            </dt>
+            <dd className="text-lg font-semibold">{formatCount(vehicle.saveCount)}</dd>
+          </div>
         </dl>
-        <p className="mt-2 text-sm text-muted">{countLabel(vehicle.saveCount, "Mal gemerkt", "Mal gemerkt")}</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Link
             href={`/vorschau/${vehicle.id}`}
@@ -240,8 +247,4 @@ function standLabel(stand: ListingStand): string {
 
 function formatCount(count: number): string {
   return new Intl.NumberFormat("de-DE").format(count);
-}
-
-function countLabel(count: number, singular: string, plural: string): string {
-  return `${new Intl.NumberFormat("de-DE").format(count)} ${count === 1 ? singular : plural}`;
 }

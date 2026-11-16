@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, Globe, Mail, MapPin, Phone } from "lucide-react";
 import { VehicleCard } from "@/components/VehicleCard";
+import { loadCardMarks, marksFor } from "@/lib/account";
 import { dealerJsonLd, getDealer, listDealerOffers, type PublicDealer } from "@/lib/dealers";
 import { formatDay, formatOfferCount } from "@/lib/format";
 import { serializeJsonLd } from "@/lib/listing-seo";
@@ -62,7 +63,7 @@ export default async function DealerPage({ params }: PageProps<"/haendler/[id]">
 }
 
 async function DealerBody({ dealer }: { dealer: PublicDealer }) {
-  const offers = await listDealerOffers(dealer.id);
+  const [offers, marks] = await Promise.all([listDealerOffers(dealer.id), loadCardMarks(`/haendler/${dealer.id}`)]);
   const address = [dealer.street, [dealer.postalCode, dealer.city].filter(Boolean).join(" ")].filter(
     (line): line is string => Boolean(line),
   );
@@ -120,7 +121,7 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
               <ul className="mt-4 grid gap-4 sm:grid-cols-2">
                 {offers.map((offer) => (
                   <li key={offer.id}>
-                    <VehicleCard vehicle={offer} />
+                    <VehicleCard vehicle={offer} marks={marksFor(offer.id, marks)} />
                   </li>
                 ))}
               </ul>
