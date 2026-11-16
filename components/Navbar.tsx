@@ -12,6 +12,7 @@ export type NavbarUser = {
 const links = [
   { href: "/suche", label: "Fahrzeuge suchen" },
   { href: "/haendler", label: "Händler" },
+  { href: "/preise", label: "Preise" },
 ] as const;
 
 export function Navbar({ user }: { user: NavbarUser | null }) {

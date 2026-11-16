@@ -17,6 +17,7 @@ export type OwnedVehicle = {
   viewCount: number;
   inquiryCount: number;
   saveCount: number;
+  billingSource: "einzeln" | "paket";
 };
 
 export type OwnedDraft = {
@@ -58,7 +59,7 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("vehicles")
-    .select("id, brand, model, type, price, status, published_until, created_at, view_count, vehicle_images(url, is_main)")
+    .select("id, brand, model, type, price, status, published_until, created_at, view_count, billing_source, vehicle_images(url, is_main)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -98,6 +99,7 @@ export async function listOwnedVehicles(userId: string): Promise<OwnedVehicle[]>
         viewCount: readNumber(row.view_count) ?? 0,
         inquiryCount: signals.get(row.id)?.inquiries ?? 0,
         saveCount: signals.get(row.id)?.saves ?? 0,
+        billingSource: readString(row.billing_source) === "paket" ? "paket" : "einzeln",
       },
     ];
   });
