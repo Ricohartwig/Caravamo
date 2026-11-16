@@ -89,6 +89,9 @@ async function DealerBody({ dealer }: { dealer: PublicDealer }) {
         ) : null}
         <div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{dealer.companyName}</h1>
+          {dealer.verified ? (
+            <p className="mt-2 inline-flex rounded-full bg-pine px-2.5 py-1 text-xs font-semibold text-foam">Verifiziert</p>
+          ) : null}
           <p className="mt-2 text-muted">
             Ansprechpartner {dealer.contactName}
             {dealer.memberSince ? ` · dabei seit ${formatDay(dealer.memberSince)}` : ""}

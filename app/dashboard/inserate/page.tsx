@@ -38,6 +38,7 @@ const filters: { id: "alle" | ListingStand; label: string }[] = [
   { id: "inaktiv", label: "Pausiert" },
   { id: "abgelaufen", label: "Abgelaufen" },
   { id: "verkauft", label: "Verkauft" },
+  { id: "gesperrt", label: "Gesperrt" },
 ];
 
 export default function InseratePage({
@@ -173,7 +174,8 @@ function OwnedListingRow({ vehicle, packageFree }: { vehicle: OwnedVehicle; pack
           >
             Vorschau
           </Link>
-          {stand === "aktiv" ? (
+          {stand === "gesperrt" ? <p className="text-sm font-semibold">Dieses Inserat ist gesperrt.</p> : null}
+          {stand === "gesperrt" ? null : stand === "aktiv" ? (
             <Link
               href={`/fahrzeug/${vehicle.id}`}
               className="inline-flex h-11 items-center justify-center rounded-xl border border-line px-4 text-sm font-semibold hover:bg-sand"
@@ -215,14 +217,18 @@ function OwnedListingRow({ vehicle, packageFree }: { vehicle: OwnedVehicle; pack
               </button>
             </form>
           ) : null}
-          <ListingControls id={vehicle.id} status={vehicle.status} publishedUntil={vehicle.publishedUntil} />
-          <Link
-            href={`/inserieren/${vehicle.id}`}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
-          >
-            Bearbeiten
-          </Link>
-          <DeleteListingButton id={vehicle.id} title={vehicle.title} />
+          {stand === "gesperrt" ? null : (
+            <>
+              <ListingControls id={vehicle.id} status={vehicle.status} publishedUntil={vehicle.publishedUntil} />
+              <Link
+                href={`/inserieren/${vehicle.id}`}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
+              >
+                Bearbeiten
+              </Link>
+              <DeleteListingButton id={vehicle.id} title={vehicle.title} />
+            </>
+          )}
         </div>
       </div>
     </article>
@@ -241,6 +247,9 @@ function standLabel(stand: ListingStand): string {
   }
   if (stand === "abgelaufen") {
     return "Abgelaufen";
+  }
+  if (stand === "gesperrt") {
+    return "Gesperrt";
   }
   return "Entwurf";
 }

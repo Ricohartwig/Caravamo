@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { accountBlocked } from "@/lib/account";
 import { isListingCategory } from "@/lib/listing-options";
 import { hideIrrelevant } from "@/lib/listing-sections";
 import { listingSubmitSchema, type NormalizedListing } from "@/lib/listing-schema";
@@ -325,6 +326,10 @@ async function prepareListing(input: unknown): Promise<
     return { error: "Bitte melde dich an, bevor du ein Inserat speicherst." };
   }
 
+  if (await accountBlocked(user.id)) {
+    return { error: "Dieses Konto ist gesperrt." };
+  }
+
   const listing = hideIrrelevant(parsed.data);
   if (!isListingCategory(listing.category ?? "") || listing.price === null || !listing.brand || !listing.model) {
     return { error: "Bitte prüfe die markierten Angaben." };
@@ -461,6 +466,10 @@ async function ownedListing(id: string): Promise<{
   const user = authData.user;
   if (!user) {
     redirect(`/login?next=/dashboard/inserate`);
+  }
+
+  if (await accountBlocked(user.id)) {
+    redirect("/gesperrt");
   }
 
   const { data, error } = await supabase

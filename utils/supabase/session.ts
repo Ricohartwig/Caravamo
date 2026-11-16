@@ -9,7 +9,9 @@ export async function updateSession(request: NextRequest) {
     pathname === "/inserieren" ||
     pathname.startsWith("/inserieren/") ||
     pathname === "/dashboard" ||
-    pathname.startsWith("/dashboard/");
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
 
   if (!isSupabaseConfigured()) {
     if (!needsAccount) {
@@ -50,6 +52,20 @@ export async function updateSession(request: NextRequest) {
 
   const { data } = await supabase.auth.getUser();
   const user = data.user;
+
+  if (user && needsAccount) {
+    const { data: profile } = await supabase.from("users").select("blocked_at").eq("id", user.id).maybeSingle();
+    if (typeof profile?.blocked_at === "string" && profile.blocked_at.length > 0) {
+      const blockedUrl = request.nextUrl.clone();
+      blockedUrl.pathname = "/gesperrt";
+      blockedUrl.search = "";
+      const blockedResponse = NextResponse.redirect(blockedUrl);
+      for (const cookie of supabaseResponse.cookies.getAll()) {
+        blockedResponse.cookies.set(cookie);
+      }
+      return blockedResponse;
+    }
+  }
 
   if (!needsAccount || user) {
     return supabaseResponse;

@@ -63,7 +63,20 @@ async function Profile({ searchParams }: { searchParams: Promise<{ hinweis?: str
     <div className="max-w-3xl">
       <h1 className="text-3xl font-semibold tracking-tight">Profil</h1>
       <p className="mt-2 text-muted">
-        Du bist als {profile.roleLabel} angemeldet. Die Kontoart legt den Preis eines Inserats fest und bleibt, wie sie bei der Registrierung gewählt wurde.
+        {profile.admin ? (
+          <>
+            Du bist als Admin angemeldet. Die{" "}
+            <Link href="/admin" className="font-semibold text-pine hover:underline">
+              Betreiber-Kontrolle
+            </Link>{" "}
+            zeigt Inserate, Händler und die Kennzahlen. Inserate aus diesem Konto kosten den Privatpreis.
+          </>
+        ) : (
+          <>
+            Du bist als {profile.roleLabel} angemeldet. Die Kontoart legt den Preis eines Inserats fest und bleibt, wie sie
+            bei der Registrierung gewählt wurde.
+          </>
+        )}
       </p>
       <p className="mt-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm">
         {profile.gaps.length === 0
