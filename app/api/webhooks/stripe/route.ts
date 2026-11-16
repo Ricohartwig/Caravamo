@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { decideActivation, type PaidCheckout } from "@/lib/listing-payment";
+import { subscriptionIdFromInvoice, syncDealerSubscription } from "@/lib/package-billing";
 import { isBusinessRole, isStripeConfigured, getStripe, paymentCatalog, webhookSecret } from "@/lib/stripe";
 import { createAdminClient, isServiceRoleConfigured } from "@/utils/supabase/admin";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 
-const handledEvents = new Set(["checkout.session.completed", "checkout.session.async_payment_succeeded"]);
+const checkoutEvents = new Set(["checkout.session.completed", "checkout.session.async_payment_succeeded"]);
+const subscriptionEvents = new Set([
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+]);
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isSupabaseConfigured() || !isServiceRoleConfigured() || !isStripeConfigured()) {
@@ -26,12 +32,34 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Signatur ist ungültig." }, { status: 400 });
   }
 
-  if (!handledEvents.has(event.type)) {
+  if (subscriptionEvents.has(event.type)) {
+    await syncDealerSubscription(event.data.object as Stripe.Subscription);
+    return NextResponse.json({ received: true });
+  }
+
+  if (event.type === "invoice.paid") {
+    const subscriptionId = subscriptionIdFromInvoice(event.data.object as Stripe.Invoice);
+    if (subscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      await syncDealerSubscription(subscription);
+    }
+    return NextResponse.json({ received: true });
+  }
+
+  if (!checkoutEvents.has(event.type)) {
     return NextResponse.json({ received: true });
   }
 
   const received = event.data.object as Stripe.Checkout.Session;
   const session = await stripe.checkout.sessions.retrieve(received.id, { expand: ["line_items"] });
+  if (session.mode === "subscription") {
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+    if (subscriptionId) {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      await syncDealerSubscription(subscription);
+    }
+    return NextResponse.json({ received: true });
+  }
   const checkout = readCheckout(session);
   if (!checkout.vehicleId) {
     return NextResponse.json({ received: true });

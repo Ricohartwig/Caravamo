@@ -48,6 +48,11 @@ alter table public.vehicles add column if not exists first_registration date;
 alter table public.vehicles add column if not exists published_until timestamptz;
 alter table public.vehicles add column if not exists stripe_session_id text;
 alter table public.vehicles add column if not exists view_count integer not null default 0;
+alter table public.vehicles add column if not exists billing_source text not null default 'einzeln';
+
+alter table public.vehicles drop constraint if exists vehicles_billing_source_known;
+alter table public.vehicles add constraint vehicles_billing_source_known
+  check (billing_source in ('einzeln', 'paket'));
 
 create unique index if not exists vehicles_stripe_session_id_key
   on public.vehicles (stripe_session_id)
@@ -312,11 +317,13 @@ begin
     new.published_until := null;
     new.stripe_session_id := null;
     new.view_count := 0;
+    new.billing_source := 'einzeln';
     return new;
   end if;
 
   if new.published_until is distinct from old.published_until
-     or new.stripe_session_id is distinct from old.stripe_session_id then
+     or new.stripe_session_id is distinct from old.stripe_session_id
+     or new.billing_source is distinct from old.billing_source then
     raise exception 'Laufzeit und Zahlung setzt nur die bestätigte Zahlung';
   end if;
 
@@ -384,6 +391,60 @@ drop trigger if exists guard_vehicle_publication on public.vehicles;
 create trigger guard_vehicle_publication
   before insert or update on public.vehicles
   for each row execute function public.guard_vehicle_publication();
+
+create table if not exists public.dealer_subscriptions (
+  user_id uuid primary key references public.users (id) on delete cascade,
+  stripe_customer_id text not null,
+  stripe_subscription_id text,
+  price_id text,
+  slots integer not null default 0,
+  status text not null,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  updated_at timestamptz not null default now(),
+  constraint dealer_subscriptions_slots_nonnegative check (slots >= 0),
+  constraint dealer_subscriptions_status_known check (char_length(status) between 1 and 40)
+);
+
+create unique index if not exists dealer_subscriptions_stripe_subscription_id_key
+  on public.dealer_subscriptions (stripe_subscription_id)
+  where stripe_subscription_id is not null;
+
+alter table public.dealer_subscriptions enable row level security;
+
+drop policy if exists "dealer_subscriptions_select_own" on public.dealer_subscriptions;
+create policy "dealer_subscriptions_select_own"
+  on public.dealer_subscriptions
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+grant select on public.dealer_subscriptions to authenticated;
+
+create or replace function public.guard_user_billing()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('postgres', 'supabase_admin') or auth.role() = 'service_role' then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.stripe_customer_id := null;
+    return new;
+  end if;
+
+  new.stripe_customer_id := old.stripe_customer_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_user_billing on public.users;
+create trigger guard_user_billing
+  before insert or update on public.users
+  for each row execute function public.guard_user_billing();
 
 create policy "vehicle_camper_details_insert_own"
   on public.vehicle_camper_details
@@ -461,6 +522,11 @@ alter table public.users add column if not exists register_court text;
 alter table public.users add column if not exists register_number text;
 alter table public.users add column if not exists public_email text;
 alter table public.users add column if not exists represented_by text;
+alter table public.users add column if not exists stripe_customer_id text;
+
+create unique index if not exists users_stripe_customer_id_key
+  on public.users (stripe_customer_id)
+  where stripe_customer_id is not null;
 
 alter table public.users drop constraint if exists users_postal_code_shape;
 alter table public.users add constraint users_postal_code_shape

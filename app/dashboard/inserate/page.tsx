@@ -4,10 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { payForListing } from "@/actions/checkout";
+import { publishWithPackage } from "@/actions/packages";
 import { DeleteListingButton } from "@/components/dashboard/DeleteListingButton";
 import { ListingControls } from "@/components/dashboard/ListingControls";
 import { VehiclePlaceholder } from "@/components/VehiclePlaceholder";
-import { currentUser } from "@/lib/account";
+import { accountProfile, currentUser } from "@/lib/account";
+import { packageAllowance } from "@/lib/dealer-subscription";
 import { formatDay, formatPrice } from "@/lib/format";
 import { listingNeedsPayment, listingStand, type ListingStand } from "@/lib/listing-state";
 import { listOwnedVehicles, type OwnedVehicle } from "@/lib/owned-listings";
@@ -21,6 +23,8 @@ const notices: Record<string, string> = {
   online: "Das Inserat ist wieder online.",
   pausiert: "Das Inserat ist pausiert. Die bezahlte Laufzeit läuft weiter.",
   verkauft: "Das Inserat ist als verkauft markiert und aus der Suche genommen.",
+  paket: "Das Inserat ist über dein Paket online.",
+  "paket-voll": "Alle Plätze im Paket sind belegt. Weitere Fahrzeuge buchst du einzeln oder wechselst das Paket.",
   "nicht-moeglich": "Das geht mit diesem Inserat gerade nicht.",
   "kopie-fehler": "Die Kopie konnte nicht angelegt werden.",
   unbekannt: "Dieses Inserat gehört nicht zu deinem Konto.",
@@ -61,6 +65,8 @@ async function OwnedListings({
   const noticeKey = Array.isArray(params.hinweis) ? params.hinweis[0] : params.hinweis;
   const requested = Array.isArray(params.stand) ? params.stand[0] : params.stand;
   const stand = filters.some((filter) => filter.id === requested) ? (requested as (typeof filters)[number]["id"]) : "alle";
+  const profile = await accountProfile(user.id);
+  const allowance = profile.business ? await packageAllowance(user.id) : null;
   const vehicles = await listOwnedVehicles(user.id);
   const visibleVehicles = vehicles.filter((vehicle) => stand === "alle" || listingStand(vehicle.status, vehicle.publishedUntil) === stand);
 
@@ -68,7 +74,7 @@ async function OwnedListings({
     <div>
       <h1 className="text-3xl font-semibold tracking-tight">Meine Inserate</h1>
       <p className="mt-2 max-w-2xl text-muted">
-        Jedes Inserat lässt sich als Vorschau ansehen, bezahlt oder noch offen. Ein bezahltes Inserat kannst du pausieren und wieder online stellen. Die Laufzeit läuft dabei weiter.
+        Hier bearbeitest du den Preis, pausierst ein Inserat oder löschst es. Unter jedem Fahrzeug stehen die Aufrufe des Exposés und die Kontaktanfragen. Ein bezahltes Inserat kannst du pausieren und wieder online stellen. Die Laufzeit läuft dabei weiter.
       </p>
       {noticeKey && notices[noticeKey] ? (
         <p role="status" className="mt-4 rounded-2xl border border-line bg-sand px-4 py-3 text-sm">
@@ -111,7 +117,7 @@ async function OwnedListings({
         <ul className="mt-6 space-y-4">
           {visibleVehicles.map((vehicle) => (
             <li key={vehicle.id}>
-              <OwnedListingRow vehicle={vehicle} />
+              <OwnedListingRow vehicle={vehicle} packageFree={Boolean(allowance?.usable && allowance.free > 0)} />
             </li>
           ))}
         </ul>
@@ -120,7 +126,7 @@ async function OwnedListings({
   );
 }
 
-function OwnedListingRow({ vehicle }: { vehicle: OwnedVehicle }) {
+function OwnedListingRow({ vehicle, packageFree }: { vehicle: OwnedVehicle; packageFree: boolean }) {
   const stand = listingStand(vehicle.status, vehicle.publishedUntil);
   const until = vehicle.publishedUntil ? formatDay(vehicle.publishedUntil) : null;
 
@@ -142,7 +148,17 @@ function OwnedListingRow({ vehicle }: { vehicle: OwnedVehicle }) {
           {formatPrice(vehicle.price)} · {vehicle.type}
           {until && (stand === "aktiv" || stand === "inaktiv") ? ` · Laufzeit bis ${until}` : ""}
         </p>
-        <p className="mt-1 text-sm text-muted">{signalLine(vehicle)}</p>
+        <dl className="mt-3 grid max-w-md grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl bg-sand px-3 py-2">
+            <dt className="text-muted">Exposé aufgerufen</dt>
+            <dd className="text-lg font-semibold">{formatCount(vehicle.viewCount)}</dd>
+          </div>
+          <div className="rounded-xl bg-sand px-3 py-2">
+            <dt className="text-muted">Kontaktanfragen</dt>
+            <dd className="text-lg font-semibold">{formatCount(vehicle.inquiryCount)}</dd>
+          </div>
+        </dl>
+        <p className="mt-2 text-sm text-muted">{countLabel(vehicle.saveCount, "Mal gemerkt", "Mal gemerkt")}</p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Link
             href={`/vorschau/${vehicle.id}`}
@@ -158,6 +174,17 @@ function OwnedListingRow({ vehicle }: { vehicle: OwnedVehicle }) {
               Öffentliche Seite
             </Link>
           ) : null}
+          {packageFree && listingNeedsPayment(vehicle.status, vehicle.publishedUntil) ? (
+            <form action={publishWithPackage}>
+              <input type="hidden" name="id" value={vehicle.id} />
+              <button
+                type="submit"
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-pine px-4 text-sm font-semibold text-foam hover:bg-pine-deep"
+              >
+                Mit Paket veröffentlichen
+              </button>
+            </form>
+          ) : null}
           {listingNeedsPayment(vehicle.status, vehicle.publishedUntil) ? (
             <form action={payForListing}>
               <input type="hidden" name="id" value={vehicle.id} />
@@ -165,9 +192,11 @@ function OwnedListingRow({ vehicle }: { vehicle: OwnedVehicle }) {
                 type="submit"
                 className="inline-flex h-11 items-center justify-center rounded-xl bg-copper-dark px-4 text-sm font-semibold text-foam hover:bg-copper"
               >
-                {stand === "abgelaufen" ? "Erneut bezahlen" : "Jetzt bezahlen"}
+                {packageFree ? "Einzeln bezahlen" : stand === "abgelaufen" ? "Erneut bezahlen" : "Jetzt bezahlen"}
               </button>
             </form>
+          ) : stand === "aktiv" && vehicle.billingSource === "paket" ? (
+            <p className="text-sm font-semibold text-pine">Läuft über das Paket</p>
           ) : stand === "aktiv" ? (
             <form action={payForListing}>
               <input type="hidden" name="id" value={vehicle.id} />
@@ -209,8 +238,8 @@ function standLabel(stand: ListingStand): string {
   return "Entwurf";
 }
 
-function signalLine(vehicle: OwnedVehicle): string {
-  return `${countLabel(vehicle.viewCount, "Aufruf", "Aufrufe")} · ${countLabel(vehicle.inquiryCount, "Anfrage", "Anfragen")} · ${countLabel(vehicle.saveCount, "Mal gemerkt", "Mal gemerkt")}`;
+function formatCount(count: number): string {
+  return new Intl.NumberFormat("de-DE").format(count);
 }
 
 function countLabel(count: number, singular: string, plural: string): string {

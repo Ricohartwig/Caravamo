@@ -69,7 +69,7 @@ async function Overview({
     { href: "/dashboard/merkliste", label: "Merkliste", value: counts.favorites, text: "Fahrzeuge, die du behalten willst" },
     { href: "/dashboard/suchen", label: "Gespeicherte Suchen", value: counts.searches, text: "Filter, die du wiederholen willst" },
     { href: "/dashboard/anfragen", label: "Ungelesene Anfragen", value: counts.unread, text: "Nachrichten von und an Anbieter" },
-    { href: "/dashboard/inserate", label: "Eigene Inserate", value: counts.listings, text: profile.business ? "Händler, 6,99 € je 30 Tage" : "Privat, 4,99 € je 30 Tage" },
+    { href: "/dashboard/inserate", label: "Eigene Inserate", value: counts.listings, text: profile.business ? "Einzeln 6,99 € oder ein Monatspaket" : "Privat, 4,99 € je 30 Tage" },
   ];
 
   return (
@@ -95,6 +95,13 @@ async function Overview({
             : `Es fehlt noch: ${profile.gaps.map((gap) => gap.label).join(", ")}.`}
         </p>
       </Link>
+      {profile.business ? (
+        <p className="mt-3 text-sm">
+          <Link href="/dashboard/pakete" className="font-semibold text-pine hover:underline">
+            Händler-Pakete, Rechnungen und Kündigung
+          </Link>
+        </p>
+      ) : null}
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {cards.map((card) => (
           <li key={card.href}>

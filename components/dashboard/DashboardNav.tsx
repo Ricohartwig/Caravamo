@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Caravan, Eye, Heart, LayoutDashboard, MessageSquare, Scale, Search, UserRound } from "lucide-react";
+import { Caravan, Eye, Heart, LayoutDashboard, MessageSquare, Receipt, Scale, Search, UserRound } from "lucide-react";
 import type { AccountCounts } from "@/lib/account";
 
 const items = [
@@ -13,6 +13,7 @@ const items = [
   { href: "/dashboard/gesehen", label: "Angesehen", icon: Eye, count: "views" },
   { href: "/dashboard/vergleich", label: "Vergleich", icon: Scale, count: "comparisons" },
   { href: "/dashboard/inserate", label: "Inserate", icon: Caravan, count: "listings" },
+  { href: "/dashboard/pakete", label: "Pakete", icon: Receipt },
   { href: "/dashboard/profil", label: "Profil", icon: UserRound },
 ] as const;
 

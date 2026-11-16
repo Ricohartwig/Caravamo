@@ -11,6 +11,7 @@ const staticPages: Array<{
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/suche", changeFrequency: "daily", priority: 0.9 },
   { path: "/haendler", changeFrequency: "monthly", priority: 0.4 },
+  { path: "/preise", changeFrequency: "monthly", priority: 0.6 },
   { path: "/impressum", changeFrequency: "yearly", priority: 0.2 },
   { path: "/datenschutz", changeFrequency: "yearly", priority: 0.2 },
   { path: "/agb", changeFrequency: "yearly", priority: 0.2 },
