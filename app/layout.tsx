@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
 import { VehicleStructuredData } from "@/components/VehicleStructuredData";
 import { siteOrigin } from "@/lib/site";
+import { isAdminRole } from "@/lib/roles";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
 import "./globals.css";
@@ -53,11 +54,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
 }
 
 async function NavbarSlot() {
-  const email = await readSignedInEmail();
-  return <Navbar user={email ? { email } : null} />;
+  const user = await readNavbarUser();
+  return <Navbar user={user} />;
 }
 
-async function readSignedInEmail(): Promise<string | null> {
+async function readNavbarUser(): Promise<{ email: string; admin: boolean } | null> {
   if (!isSupabaseConfigured()) {
     return null;
   }
@@ -65,7 +66,13 @@ async function readSignedInEmail(): Promise<string | null> {
   try {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
-    return data.user?.email ?? null;
+    const email = data.user?.email;
+    if (!email || !data.user) {
+      return null;
+    }
+
+    const { data: profile } = await supabase.from("users").select("role").eq("id", data.user.id).maybeSingle();
+    return { email, admin: isAdminRole(typeof profile?.role === "string" ? profile.role : null) };
   } catch {
     return null;
   }

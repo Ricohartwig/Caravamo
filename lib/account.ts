@@ -9,6 +9,7 @@ import {
   type ProfileFields,
   type ProfileGap,
 } from "@/lib/profile";
+import { accountRoleLabel, isAdminRole } from "@/lib/roles";
 import { isBusinessRole } from "@/lib/stripe";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
 import { createClient } from "@/utils/supabase/server";
@@ -19,8 +20,9 @@ export type AccountUser = {
 };
 
 export type AccountProfile = ProfileFields & {
-  roleLabel: "Privat" | "Händler";
+  roleLabel: "Privat" | "Händler" | "Admin";
   business: boolean;
+  admin: boolean;
   memberSince: string;
   gaps: ProfileGap[];
   publicDealerPage: boolean;
@@ -192,7 +194,9 @@ export async function accountProfile(userId: string): Promise<AccountProfile> {
     )
     .eq("id", userId)
     .maybeSingle();
-  const business = isBusinessRole(readString(data?.role));
+  const role = readString(data?.role);
+  const admin = isAdminRole(role);
+  const business = !admin && isBusinessRole(role);
   const fields: ProfileFields = {
     ...emptyProfile(),
     name: readString(data?.name) ?? "",
@@ -216,12 +220,19 @@ export async function accountProfile(userId: string): Promise<AccountProfile> {
 
   return {
     ...fields,
-    roleLabel: business ? "Händler" : "Privat",
+    roleLabel: accountRoleLabel(role),
     business,
+    admin,
     memberSince: readString(data?.created_at) ?? "",
     gaps: profileGaps(fields, business),
     publicDealerPage: dealerPageReady(fields, business),
   };
+}
+
+export async function accountBlocked(userId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("users").select("blocked_at").eq("id", userId).maybeSingle();
+  return typeof data?.blocked_at === "string" && data.blocked_at.length > 0;
 }
 
 export async function listFavorites(userId: string): Promise<SavedVehicle[]> {

@@ -27,6 +27,7 @@ export type PublicDealer = {
   registerNumber: string | null;
   publicEmail: string | null;
   representedBy: string | null;
+  verified: boolean;
   memberSince: string | null;
   offerCount: number;
 };
@@ -113,7 +114,7 @@ const loadDealers = cache(async (): Promise<PublicDealer[]> => {
   const { data, error } = await supabase
     .from("dealer_profiles")
     .select(
-      "id, company_name, contact_name, phone, street, postal_code, city, website, about, opening_hours, vat_id, services, logo_url, legal_form, register_court, register_number, public_email, represented_by, created_at",
+      "id, company_name, contact_name, phone, street, postal_code, city, website, about, opening_hours, vat_id, services, logo_url, legal_form, register_court, register_number, public_email, represented_by, dealer_verified, created_at",
     );
 
   if (error || !Array.isArray(data)) {
@@ -150,6 +151,7 @@ const loadDealers = cache(async (): Promise<PublicDealer[]> => {
         registerNumber: readString(row.register_number),
         publicEmail: readString(row.public_email),
         representedBy: readString(row.represented_by),
+        verified: row.dealer_verified === true,
         memberSince: readString(row.created_at),
         offerCount: 0,
       },

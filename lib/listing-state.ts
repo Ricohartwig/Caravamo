@@ -1,6 +1,6 @@
 import { isPublicListing } from "@/lib/listing-payment";
 
-export type ListingStand = "entwurf" | "aktiv" | "inaktiv" | "verkauft" | "abgelaufen";
+export type ListingStand = "entwurf" | "aktiv" | "inaktiv" | "verkauft" | "abgelaufen" | "gesperrt";
 
 export function listingStand(status: string, publishedUntil: string | null, now = Date.now()): ListingStand {
   if (status === "verkauft") {
@@ -13,6 +13,10 @@ export function listingStand(status: string, publishedUntil: string | null, now 
 
   if (status === "aktiv") {
     return isPublicListing(status, publishedUntil, now) ? "aktiv" : "abgelaufen";
+  }
+
+  if (status === "gesperrt") {
+    return "gesperrt";
   }
 
   return "entwurf";

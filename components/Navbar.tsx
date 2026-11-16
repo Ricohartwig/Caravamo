@@ -7,6 +7,7 @@ import { signOut } from "@/actions/auth";
 
 export type NavbarUser = {
   email: string;
+  admin: boolean;
 };
 
 const links = [
@@ -17,6 +18,7 @@ const links = [
 
 export function Navbar({ user }: { user: NavbarUser | null }) {
   const [open, setOpen] = useState(false);
+  const navLinks = user?.admin ? [...links, { href: "/admin", label: "Administration" }] : [...links];
 
   function closeMenu() {
     setOpen(false);
@@ -40,7 +42,7 @@ export function Navbar({ user }: { user: NavbarUser | null }) {
           aria-label="Hauptnavigation"
           className="hidden flex-1 items-center justify-center gap-6 md:flex"
         >
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
@@ -80,7 +82,7 @@ export function Navbar({ user }: { user: NavbarUser | null }) {
         className="border-t border-line px-4 py-3 md:hidden"
       >
         <ul className="flex flex-col gap-1">
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <li key={link.href}>
               <Link
                 href={link.href}

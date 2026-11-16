@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Caravan, Eye, Heart, LayoutDashboard, MessageSquare, Receipt, Scale, Search, UserRound } from "lucide-react";
+import { Caravan, Eye, Heart, LayoutDashboard, MessageSquare, Receipt, Scale, Search, Shield, UserRound } from "lucide-react";
 import type { AccountCounts } from "@/lib/account";
 
 const items = [
@@ -17,12 +17,15 @@ const items = [
   { href: "/dashboard/profil", label: "Profil", icon: UserRound },
 ] as const;
 
-export function DashboardNav({ counts }: { counts: AccountCounts }) {
+export function DashboardNav({ counts, admin = false }: { counts: AccountCounts; admin?: boolean }) {
   const pathname = usePathname();
+  const entries = admin
+    ? [{ href: "/admin", label: "Administration", icon: Shield }, ...items]
+    : items;
 
   return (
     <nav aria-label="Konto" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0">
-      {items.map((item) => {
+      {entries.map((item) => {
         const active = "exact" in item && item.exact ? pathname === item.href : pathname.startsWith(item.href);
         const count = "count" in item ? counts[item.count] : 0;
         const Icon = item.icon;

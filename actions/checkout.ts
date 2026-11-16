@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { accountBlocked } from "@/lib/account";
 import { isVehicleId } from "@/lib/owned-listings";
 import { isBusinessRole, isStripeConfigured, getStripe, paymentCatalog } from "@/lib/stripe";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -22,6 +23,10 @@ export async function beginCheckout(vehicleId: string): Promise<void> {
   const user = authData.user;
   if (!user) {
     redirect(`/login?next=${encodeURIComponent(`/dashboard`)}`);
+  }
+
+  if (await accountBlocked(user.id)) {
+    redirect("/gesperrt");
   }
 
   const { data: vehicle, error } = await supabase

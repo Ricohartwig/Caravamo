@@ -52,7 +52,10 @@ async function DealerDirectory() {
                       className="size-12 shrink-0 rounded-xl border border-line bg-foam object-contain p-1"
                     />
                   ) : null}
-                  <h2 className="text-lg font-semibold">{dealer.companyName}</h2>
+                  <h2 className="text-lg font-semibold">
+                    {dealer.companyName}
+                    {dealer.verified ? <span className="ml-2 align-middle text-xs font-semibold text-pine">Verifiziert</span> : null}
+                  </h2>
                 </div>
                 <p className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <MapPin aria-hidden="true" className="size-4 text-pine" />

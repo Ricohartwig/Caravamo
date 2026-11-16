@@ -26,7 +26,7 @@ async function DashboardFrame({ children }: { children: React.ReactNode }) {
       <p className="text-sm font-medium text-copper-dark">Konto</p>
       <p className="mt-1 text-lg text-ink">{profile.name ? `Hallo ${profile.name}` : "Willkommen"}</p>
       <div className="mt-6 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-8">
-        <DashboardNav counts={counts} />
+        <DashboardNav counts={counts} admin={profile.admin} />
         <div className="mt-6 min-w-0 lg:mt-0">{children}</div>
       </div>
     </div>

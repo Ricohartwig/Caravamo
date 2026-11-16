@@ -11,6 +11,9 @@ create table if not exists public.users (
   role text default 'privat',
   name text,
   phone text,
+  email text,
+  dealer_verified boolean not null default false,
+  blocked_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -49,6 +52,7 @@ alter table public.vehicles add column if not exists published_until timestamptz
 alter table public.vehicles add column if not exists stripe_session_id text;
 alter table public.vehicles add column if not exists view_count integer not null default 0;
 alter table public.vehicles add column if not exists billing_source text not null default 'einzeln';
+alter table public.vehicles add column if not exists status_before_block text;
 
 alter table public.vehicles drop constraint if exists vehicles_billing_source_known;
 alter table public.vehicles add constraint vehicles_billing_source_known
@@ -132,19 +136,68 @@ declare
   chosen text;
 begin
   chosen := lower(coalesce(new.raw_user_meta_data ->> 'role', 'privat'));
-  insert into public.users (id, role, name)
+  if chosen in ('haendler', 'händler') then
+    chosen := 'haendler';
+  else
+    chosen := 'privat';
+  end if;
+
+  -- Die Anmeldung kann keine Admin-Rolle wählen. Dieses Postfach wird
+  -- beim ersten Konto zum Betreiber.
+  if lower(coalesce(new.email, '')) = 'ricohartwig93@gmail.com' then
+    chosen := 'admin';
+  end if;
+
+  insert into public.users (id, role, name, email)
   values (
     new.id,
-    case when chosen in ('haendler', 'händler') then 'haendler' else 'privat' end,
+    chosen,
     coalesce(
       new.raw_user_meta_data ->> 'name',
       new.raw_user_meta_data ->> 'full_name',
       split_part(coalesce(new.email, ''), '@', 1)
-    )
+    ),
+    new.email
   );
   return new;
 end;
 $$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.users
+    where id = auth.uid()
+      and lower(role) = 'admin'
+      and blocked_at is null
+  );
+$$;
+
+create or replace function public.account_is_open()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select not exists (
+    select 1
+    from public.users
+    where id = auth.uid()
+      and blocked_at is not null
+  );
+$$;
+
+revoke all on function public.is_admin() from public;
+revoke all on function public.account_is_open() from public;
+grant execute on function public.is_admin() to anon, authenticated;
+grant execute on function public.account_is_open() to anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 
@@ -207,20 +260,20 @@ create policy "vehicles_insert_own"
   on public.vehicles
   for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check (auth.uid() = user_id and public.account_is_open());
 
 create policy "vehicles_delete_own"
   on public.vehicles
   for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id and public.account_is_open());
 
 create policy "vehicles_update_own"
   on public.vehicles
   for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid() = user_id and public.account_is_open())
+  with check (auth.uid() = user_id and public.account_is_open());
 
 create policy "users_select_own"
   on public.users
@@ -234,6 +287,44 @@ create policy "users_update_own"
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
+
+create policy "users_select_admin"
+  on public.users
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy "users_update_admin"
+  on public.users
+  for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+create policy "vehicles_select_admin"
+  on public.vehicles
+  for select
+  to authenticated
+  using (public.is_admin());
+
+create policy "vehicles_update_admin"
+  on public.vehicles
+  for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+create policy "vehicles_delete_admin"
+  on public.vehicles
+  for delete
+  to authenticated
+  using (public.is_admin());
+
+create policy "vehicle_images_select_admin"
+  on public.vehicle_images
+  for select
+  to authenticated
+  using (public.is_admin());
 
 create policy "vehicle_images_insert_own"
   on public.vehicle_images
@@ -312,6 +403,14 @@ begin
     return new;
   end if;
 
+  if tg_op = 'UPDATE' and public.is_admin() then
+    return new;
+  end if;
+
+  if not public.account_is_open() then
+    raise exception 'Dieses Konto ist gesperrt';
+  end if;
+
   if tg_op = 'INSERT' then
     new.status := 'entwurf';
     new.published_until := null;
@@ -325,6 +424,10 @@ begin
      or new.stripe_session_id is distinct from old.stripe_session_id
      or new.billing_source is distinct from old.billing_source then
     raise exception 'Laufzeit und Zahlung setzt nur die bestätigte Zahlung';
+  end if;
+
+  if old.status = 'gesperrt' then
+    raise exception 'Dieses Inserat ist gesperrt';
   end if;
 
   if new.status is not distinct from old.status then
@@ -586,6 +689,14 @@ alter table public.users drop constraint if exists users_represented_by_length;
 alter table public.users add constraint users_represented_by_length
   check (represented_by is null or char_length(represented_by) between 2 and 80);
 
+alter table public.users drop constraint if exists users_role_known;
+alter table public.users add constraint users_role_known
+  check (role is null or lower(role) in ('privat', 'haendler', 'händler', 'admin'));
+
+create unique index if not exists users_email_unique
+  on public.users (lower(email))
+  where email is not null;
+
 create or replace view public.seller_profiles as
 select id, name, role, city, postal_code, company_name, about
 from public.users;
@@ -611,6 +722,7 @@ select
   register_number,
   public_email,
   represented_by,
+  dealer_verified,
   created_at
 from public.users
 where lower(coalesce(role, '')) in ('haendler', 'händler')
@@ -644,6 +756,41 @@ drop trigger if exists guard_user_role on public.users;
 create trigger guard_user_role
   before update on public.users
   for each row execute function public.guard_user_role();
+
+create or replace function public.guard_user_moderation()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE'
+     and new.blocked_at is not null
+     and old.blocked_at is null
+     and new.id = auth.uid()
+     and current_user not in ('postgres', 'supabase_admin')
+     and auth.role() is distinct from 'service_role' then
+    raise exception 'Das eigene Konto bleibt offen';
+  end if;
+
+  if current_user in ('postgres', 'supabase_admin') or auth.role() = 'service_role' or public.is_admin() then
+    return new;
+  end if;
+
+  if new.dealer_verified is distinct from old.dealer_verified
+     or new.blocked_at is distinct from old.blocked_at
+     or new.email is distinct from old.email then
+    raise exception 'Diese Angaben setzt nur die Betreiber-Kontrolle';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_user_moderation on public.users;
+
+create trigger guard_user_moderation
+  before update on public.users
+  for each row execute function public.guard_user_moderation();
 
 create table if not exists public.favorites (
   user_id uuid not null references public.users (id) on delete cascade,
@@ -739,6 +886,13 @@ create policy "favorites_delete"
   to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "favorites_select_admin" on public.favorites;
+create policy "favorites_select_admin"
+  on public.favorites
+  for select
+  to authenticated
+  using (public.is_admin());
+
 drop policy if exists "favorites_insert" on public.favorites;
 create policy "favorites_insert"
   on public.favorites
@@ -746,6 +900,7 @@ create policy "favorites_insert"
   to authenticated
   with check (
     user_id = auth.uid()
+    and public.account_is_open()
     and exists (
       select 1
       from public.vehicles
@@ -771,6 +926,13 @@ create policy "saved_searches_own"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
+drop policy if exists "inquiries_select_admin" on public.inquiries;
+create policy "inquiries_select_admin"
+  on public.inquiries
+  for select
+  to authenticated
+  using (public.is_admin());
+
 drop policy if exists "inquiries_select_party" on public.inquiries;
 create policy "inquiries_select_party"
   on public.inquiries
@@ -785,6 +947,7 @@ create policy "inquiries_insert_buyer"
   to authenticated
   with check (
     sender_id = auth.uid()
+    and public.account_is_open()
     and sender_id <> recipient_id
     and exists (
       select 1

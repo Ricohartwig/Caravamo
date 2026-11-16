@@ -202,7 +202,10 @@ async function requireDealer(next = "/dashboard/pakete"): Promise<{ id: string; 
     redirect(`/login?next=${encodeURIComponent(next)}`);
   }
 
-  const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("users").select("role, blocked_at").eq("id", user.id).maybeSingle();
+  if (typeof profile?.blocked_at === "string" && profile.blocked_at.length > 0) {
+    redirect("/gesperrt");
+  }
   if (!isBusinessRole(typeof profile?.role === "string" ? profile.role : null)) {
     redirect("/dashboard/pakete?abo=nur-haendler");
   }
