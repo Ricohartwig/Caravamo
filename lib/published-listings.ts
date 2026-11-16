@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { connection } from "next/server";
-import { blankFilters, camperFilterActive, type VehicleFilters } from "@/lib/filters";
+import { blankFilters, camperFilterActive, standHeating, type VehicleFilters } from "@/lib/filters";
+import { toilets } from "@/lib/listing-options";
 import { isPublicListing } from "@/lib/listing-payment";
 import { isVehicleId } from "@/lib/owned-listings";
 import { isSupabaseConfigured } from "@/utils/supabase/env";
@@ -50,6 +51,11 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
   await connection();
   const now = new Date().toISOString();
   const supabase = await createClient();
+  const sellers = await matchingSellerIds(supabase, filters);
+  if (sellers && sellers.length === 0) {
+    return [];
+  }
+
   const details = camperFilterActive(filters)
     ? "vehicle_camper_details!inner(body_type)"
     : "vehicle_camper_details(body_type)";
@@ -77,6 +83,24 @@ export async function searchOffers(filters: VehicleFilters, limit = 48): Promise
   }
   if (filters.priceMax !== null) {
     query = query.lte("price", filters.priceMax);
+  }
+  if (filters.yearMin !== null) {
+    query = query.gte("year", filters.yearMin);
+  }
+  if (filters.yearMax !== null) {
+    query = query.lte("year", filters.yearMax);
+  }
+  if (filters.mileageMin !== null) {
+    query = query.gte("mileage", filters.mileageMin);
+  }
+  if (filters.mileageMax !== null) {
+    query = query.lte("mileage", filters.mileageMax);
+  }
+  if (filters.condition) {
+    query = query.eq("condition", filters.condition);
+  }
+  if (sellers) {
+    query = query.in("user_id", sellers);
   }
   query = applyCamperFilters(query, filters);
 
@@ -125,8 +149,73 @@ function applyCamperFilters<T extends CamperQuery<T>>(query: T, filters: Vehicle
   if (filters.sleepMin !== null) {
     query = query.gte("vehicle_camper_details.sleeping_places", filters.sleepMin);
   }
+  if (filters.lengthMin !== null) {
+    query = query.gte("vehicle_camper_details.length_cm", filters.lengthMin);
+  }
+  if (filters.lengthMax !== null) {
+    query = query.lte("vehicle_camper_details.length_cm", filters.lengthMax);
+  }
+  if (filters.powerMin !== null) {
+    query = query.gte("vehicle_camper_details.power_ps", filters.powerMin);
+  }
+  if (filters.heater) {
+    query = query.in("vehicle_camper_details.heating", [...standHeating]);
+  }
+  if (filters.shower) {
+    query = query.eq("vehicle_camper_details.shower", "separate Dusche");
+  }
+  if (filters.toilet) {
+    query = query.in("vehicle_camper_details.toilet", [...toilets]);
+  }
+  if (filters.seating) {
+    query = query.eq("vehicle_camper_details.seating_group", "Rundsitzgruppe");
+  }
+  if (filters.sat) {
+    query = query.contains("vehicle_camper_details.connectivity", ["SAT-TV"]);
+  }
+  if (filters.bike) {
+    query = query.eq("vehicle_camper_details.has_bike_rack", true);
+  }
+  if (filters.hitch) {
+    query = query.eq("vehicle_camper_details.has_tow_hitch", true);
+  }
 
   return query;
+}
+
+async function matchingSellerIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  filters: VehicleFilters,
+): Promise<string[] | null> {
+  if (!filters.city && !filters.seller) {
+    return null;
+  }
+
+  const { data, error } = await supabase.from("seller_profiles").select("id, role, city, postal_code");
+  if (error || !Array.isArray(data)) {
+    return [];
+  }
+
+  const needle = filters.city.toLocaleLowerCase("de-DE");
+  return data.flatMap((row) => {
+    if (!isRecord(row) || typeof row.id !== "string") {
+      return [];
+    }
+    const role = typeof row.role === "string" ? row.role.toLocaleLowerCase("de-DE") : "";
+    const dealer = role === "haendler" || role === "händler";
+    if (filters.seller === "haendler" && !dealer) {
+      return [];
+    }
+    if (filters.seller === "privat" && dealer) {
+      return [];
+    }
+    const place = `${typeof row.postal_code === "string" ? row.postal_code : ""} ${typeof row.city === "string" ? row.city : ""}`
+      .toLocaleLowerCase("de-DE");
+    if (needle && !place.includes(needle)) {
+      return [];
+    }
+    return [row.id];
+  });
 }
 
 type CamperQuery<T> = {
@@ -134,6 +223,7 @@ type CamperQuery<T> = {
   lte: (column: string, value: number) => T;
   gte: (column: string, value: number) => T;
   contains: (column: string, value: readonly string[]) => T;
+  in: (column: string, value: readonly string[]) => T;
 };
 
 function escapeLike(value: string): string {
