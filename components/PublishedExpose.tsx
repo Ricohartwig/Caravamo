@@ -1,25 +1,35 @@
 import Link from "next/link";
 import { SavedCount } from "@/components/account/SavedCount";
+import { DealerOnListing } from "@/components/DealerOnListing";
 import { ListingFacts } from "@/components/ListingFacts";
+import { OfferRail } from "@/components/OfferRail";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { SellerContact } from "@/components/SellerContact";
+import { VehicleCard } from "@/components/VehicleCard";
 import { VehiclePlaceholder } from "@/components/VehiclePlaceholder";
-import type { CardMarks } from "@/lib/account";
+import { marksFor, type CardMarks } from "@/lib/account";
+import type { PublicDealer } from "@/lib/dealers";
 import { formatPrice } from "@/lib/format";
 import { isPublicListing } from "@/lib/listing-payment";
 import { listingStand } from "@/lib/listing-state";
-import type { PublishedListing } from "@/lib/published-listings";
+import type { OfferCard, PublishedListing } from "@/lib/published-listings";
 
 export function PublishedExpose({
   listing,
   viewerId,
   marks,
   savedCount = null,
+  dealer = null,
+  otherOffers = [],
+  library = null,
 }: {
   listing: PublishedListing;
   viewerId: string | null;
   marks: CardMarks;
   savedCount?: number | null;
+  dealer?: PublicDealer | null;
+  otherOffers?: OfferCard[];
+  library?: { signedIn: boolean; favorites: Set<string>; comparisons: Set<string>; returnTo: string } | null;
 }) {
   const price = listing.priceTax
     ? `${formatPrice(listing.price)} ${listing.priceTax}`
@@ -50,7 +60,7 @@ export function PublishedExpose({
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
           {listing.imageUrls.length > 0 ? (
-            <PhotoGallery title={listing.title} urls={listing.imageUrls} />
+            <PhotoGallery title={listing.title} urls={listing.imageUrls} galleryId={listing.id} />
           ) : (
             <VehiclePlaceholder title={listing.title} type={listing.type} tone={0} label="Front" />
           )}
@@ -74,6 +84,33 @@ export function PublishedExpose({
           marks={marks}
         />
       </div>
+      {dealer ? <DealerOnListing dealer={dealer} /> : null}
+      {otherOffers.length > 0 ? (
+        <OfferRail
+          id={`angebote-${listing.id}`}
+          title={listing.sellerKind === "Händler" ? "Weitere Fahrzeuge dieses Händlers" : "Weitere Fahrzeuge dieses Anbieters"}
+          aside={
+            listing.sellerHref ? (
+              <Link href={listing.sellerHref} className="text-sm font-semibold text-pine hover:underline">
+                Alle ansehen
+              </Link>
+            ) : null
+          }
+        >
+          {otherOffers.map((offer) => (
+            <li key={offer.id} className="w-72 shrink-0 snap-start">
+              <VehicleCard
+                vehicle={offer}
+                marks={
+                  library
+                    ? marksFor(offer.id, library)
+                    : { signedIn: false, saved: false, compared: false, returnTo: `/fahrzeug/${listing.id}` }
+                }
+              />
+            </li>
+          ))}
+        </OfferRail>
+      ) : null}
     </article>
   );
 }

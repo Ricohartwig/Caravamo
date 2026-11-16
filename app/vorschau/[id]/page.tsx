@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { PublishedExpose } from "@/components/PublishedExpose";
 import { ListingControls } from "@/components/dashboard/ListingControls";
 import { currentUser, loadCardMarks } from "@/lib/account";
+import { getDealer, listDealerOffers } from "@/lib/dealers";
 import { formatDay } from "@/lib/format";
 import { listingStand, paidTimeLeft } from "@/lib/listing-state";
 import { isVehicleId, ownerSaveCount } from "@/lib/owned-listings";
@@ -50,7 +51,14 @@ export default async function PreviewPage({
   const status = typeof listing.values.status === "string" ? listing.values.status : "entwurf";
   const publishedUntil = typeof listing.values.published_until === "string" ? listing.values.published_until : null;
   const stand = listingStand(status, publishedUntil);
-  const [saved, savedCount] = await Promise.all([loadCardMarks(`/vorschau/${id}`), ownerSaveCount(id)]);
+  const returnTo = `/vorschau/${id}`;
+  const [saved, savedCount, dealer, offers] = await Promise.all([
+    loadCardMarks(returnTo),
+    ownerSaveCount(id),
+    listing.sellerKind === "Händler" ? getDealer(listing.sellerId) : Promise.resolve(null),
+    listDealerOffers(listing.sellerId),
+  ]);
+  const otherOffers = offers.filter((offer) => offer.id !== id);
 
   return (
     <>
@@ -94,11 +102,14 @@ export default async function PreviewPage({
         listing={listing}
         viewerId={user.id}
         savedCount={savedCount}
+        dealer={dealer}
+        otherOffers={otherOffers}
+        library={saved}
         marks={{
           signedIn: true,
           saved: saved.favorites.has(id),
           compared: saved.comparisons.has(id),
-          returnTo: `/vorschau/${id}`,
+          returnTo,
         }}
       />
     </>
